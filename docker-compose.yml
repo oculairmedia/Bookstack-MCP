@@ -1,0 +1,18 @@
+version: "3.8"
+services:
+  mcp-server:
+    build:
+      context: .
+    container_name: mcp-framework-server
+    environment:
+      - NODE_ENV=development
+      - PORT=3004
+      - TRANSPORT=sse
+      - BS_URL=https://knowledge.oculair.ca
+      - BS_TOKEN_ID=POnHR9Lbvm73T2IOcyRSeAqpA8bSGdMT
+      - BS_TOKEN_SECRET=735wM5dScfUkcOy7qcrgqQ1eC5fBF7IE
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "3004:3004"
+    command: node dist/index.js --transport sse
+    restart: unless-stopped

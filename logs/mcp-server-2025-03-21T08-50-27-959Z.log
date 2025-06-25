@@ -1,0 +1,72 @@
+[2025-03-21T08:50:28.039Z] [DEBUG] Successfully read package.json from project root: E:\PROJECTS\letta tools\mcp-framework-server\package.json
+[2025-03-21T08:50:28.039Z] [INFO] Using name from package.json: mcp-framework-server
+[2025-03-21T08:50:28.040Z] [DEBUG] Successfully read package.json from project root: E:\PROJECTS\letta tools\mcp-framework-server\package.json
+[2025-03-21T08:50:28.040Z] [INFO] Using version from package.json: 0.0.1
+[2025-03-21T08:50:28.040Z] [INFO] Initializing MCP Server: mcp-framework-server@0.0.1
+[2025-03-21T08:50:28.040Z] [DEBUG] Initialized ToolLoader with directory: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools
+[2025-03-21T08:50:28.041Z] [DEBUG] Initialized PromptLoader with directory: E:\PROJECTS\letta tools\mcp-framework-server\dist\prompts
+[2025-03-21T08:50:28.041Z] [DEBUG] Initialized ResourceLoader with directory: E:\PROJECTS\letta tools\mcp-framework-server\dist\resources
+[2025-03-21T08:50:28.041Z] [DEBUG] Looking for tools in: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools
+[2025-03-21T08:50:28.041Z] [DEBUG] Looking for prompts in: E:\PROJECTS\letta tools\mcp-framework-server\dist\prompts
+[2025-03-21T08:50:28.041Z] [DEBUG] Looking for resources in: E:\PROJECTS\letta tools\mcp-framework-server\dist\resources
+[2025-03-21T08:50:28.043Z] [DEBUG] Attempting to load tools from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools
+[2025-03-21T08:50:28.044Z] [DEBUG] Found files in directory: BookstackCreateBookTool.d.ts, BookstackCreateBookTool.js, BookstackCreatePageTool.d.ts, BookstackCreatePageTool.js, BookstackListBooksTool.d.ts, BookstackListBooksTool.js, BookstackToolBase.d.ts, BookstackToolBase.js, create_book.py, create_page.py, ExampleTool.d.ts, ExampleTool.js, ExampleToolTool.d.ts, ExampleToolTool.js, list_books.py
+[2025-03-21T08:50:28.045Z] [DEBUG] Checking file BookstackCreateBookTool.js: included
+[2025-03-21T08:50:28.045Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\BookstackCreateBookTool.js
+[2025-03-21T08:50:28.046Z] [DEBUG] Validated tool: bookstack_create_book
+[2025-03-21T08:50:28.046Z] [DEBUG] Checking file BookstackCreatePageTool.js: included
+[2025-03-21T08:50:28.047Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\BookstackCreatePageTool.js
+[2025-03-21T08:50:28.047Z] [DEBUG] Validated tool: bookstack_create_page
+[2025-03-21T08:50:28.048Z] [DEBUG] Checking file BookstackListBooksTool.js: included
+[2025-03-21T08:50:28.048Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\BookstackListBooksTool.js
+[2025-03-21T08:50:28.048Z] [DEBUG] Validated tool: bookstack_list_books
+[2025-03-21T08:50:28.048Z] [DEBUG] Checking file BookstackToolBase.js: included
+[2025-03-21T08:50:28.049Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\BookstackToolBase.js
+[2025-03-21T08:50:28.049Z] [WARN] Invalid tool found: missing required properties
+[2025-03-21T08:50:28.049Z] [DEBUG] Checking file ExampleTool.js: included
+[2025-03-21T08:50:28.049Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\ExampleTool.js
+[2025-03-21T08:50:28.052Z] [DEBUG] Validated tool: example_tool
+[2025-03-21T08:50:28.053Z] [DEBUG] Checking file ExampleToolTool.js: included
+[2025-03-21T08:50:28.053Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\ExampleToolTool.js
+[2025-03-21T08:50:28.053Z] [DEBUG] Validated tool: example_tool
+[2025-03-21T08:50:28.054Z] [DEBUG] Successfully loaded 5 tools: bookstack_create_book, bookstack_create_page, bookstack_list_books, example_tool, example_tool
+[2025-03-21T08:50:28.054Z] [DEBUG] Attempting to load prompts from: E:\PROJECTS\letta tools\mcp-framework-server\dist\prompts
+[2025-03-21T08:50:28.054Z] [DEBUG] No prompts directory found
+[2025-03-21T08:50:28.055Z] [DEBUG] Attempting to load resources from: E:\PROJECTS\letta tools\mcp-framework-server\dist\resources
+[2025-03-21T08:50:28.055Z] [DEBUG] No resources directory found
+[2025-03-21T08:50:28.055Z] [DEBUG] No prompts directory found
+[2025-03-21T08:50:28.056Z] [DEBUG] No resources directory found
+[2025-03-21T08:50:28.056Z] [DEBUG] Creating MCP Server instance
+[2025-03-21T08:50:28.056Z] [DEBUG] Server created with capabilities: {"tools":{"enabled":true}}
+[2025-03-21T08:50:28.056Z] [INFO] Starting transport...
+[2025-03-21T08:50:28.057Z] [DEBUG] Creating transport: sse
+[2025-03-21T08:50:28.057Z] [DEBUG] SSE transport configured with: {"port":8080,"endpoint":"/sse","messageEndpoint":"/messages","maxMessageSize":"4mb","headers":{"Cache-Control":"no-cache","Connection":"keep-alive"},"cors":{"allowOrigin":"*","allowMethods":"GET, POST, OPTIONS","allowHeaders":"Content-Type, Authorization, x-api-key","exposeHeaders":"Content-Type, Authorization, x-api-key","maxAge":"86400"}}
+[2025-03-21T08:50:28.061Z] [INFO] SSE transport listening on port 8080
+[2025-03-21T08:50:28.061Z] [INFO] Transport connected successfully
+[2025-03-21T08:50:28.061Z] [INFO] Started mcp-framework-server@0.0.1
+[2025-03-21T08:50:28.061Z] [INFO] Transport: sse
+[2025-03-21T08:50:28.062Z] [INFO] Tools (5): bookstack_create_book, bookstack_create_page, bookstack_list_books, example_tool
+[2025-03-21T08:50:28.062Z] [INFO] Server running and ready for connections
+[2025-03-21T08:50:30.984Z] [DEBUG] Incoming request: GET /sse
+[2025-03-21T08:50:30.985Z] [DEBUG] Setting up SSE connection for session: 2b5673e4-c787-4ada-8027-d0f5125aad61
+[2025-03-21T08:50:30.985Z] [DEBUG] SSE headers set: {"Content-Type":"text/event-stream","Cache-Control":"no-cache","Connection":"keep-alive","Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET, POST, OPTIONS","Access-Control-Allow-Headers":"Content-Type, Authorization, x-api-key","Access-Control-Expose-Headers":"Content-Type, Authorization, x-api-key"}
+[2025-03-21T08:50:30.985Z] [DEBUG] Socket optimized for SSE connection
+[2025-03-21T08:50:30.985Z] [DEBUG] Sending endpoint URL: /messages?sessionId=2b5673e4-c787-4ada-8027-d0f5125aad61
+[2025-03-21T08:50:30.986Z] [DEBUG] Sending initial keep-alive
+[2025-03-21T08:50:30.987Z] [INFO] SSE connection established successfully for session: 2b5673e4-c787-4ada-8027-d0f5125aad61
+[2025-03-21T08:50:45.995Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:51:00.996Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:51:16.007Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:51:31.020Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:51:46.035Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:52:01.037Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:52:16.043Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:52:31.058Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:52:46.062Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:53:01.071Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:53:16.076Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:53:31.089Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:53:46.100Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:54:01.113Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:54:16.124Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:54:31.130Z] [DEBUG] Sending keep-alive ping

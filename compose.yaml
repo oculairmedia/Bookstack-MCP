@@ -1,0 +1,14 @@
+services:
+  bookstackmcp:
+    image: oculair/bookstackmcp:latest
+    ports:
+      - "3054:3054"
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PORT=3054
+      - BS_URL=${BS_URL}
+      - BS_TOKEN_ID=${BS_TOKEN_ID}
+      - BS_TOKEN_SECRET=${BS_TOKEN_SECRET}
+      - NODE_ENV=${NODE_ENV:-production}

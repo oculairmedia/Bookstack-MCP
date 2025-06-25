@@ -1,0 +1,27 @@
+{
+  "name": "mcp-framework-server",
+  "version": "0.0.1",
+  "description": "mcp-framework-server MCP server",
+  "type": "module",
+  "bin": {
+    "mcp-framework-server": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && mcp-build",
+    "prepare": "npm run build",
+    "watch": "tsc --watch",
+    "copy-scripts": "node copy-scripts.js",
+    "start": "npm run copy-scripts && node dist/index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "mcp-framework": "^0.1.29"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,111 @@
+[2025-03-21T15:32:38.379Z] [DEBUG] Successfully read package.json from project root: E:\PROJECTS\letta tools\mcp-framework-server\package.json
+[2025-03-21T15:32:38.379Z] [INFO] Using name from package.json: mcp-framework-server
+[2025-03-21T15:32:38.380Z] [DEBUG] Successfully read package.json from project root: E:\PROJECTS\letta tools\mcp-framework-server\package.json
+[2025-03-21T15:32:38.380Z] [INFO] Using version from package.json: 0.0.1
+[2025-03-21T15:32:38.380Z] [INFO] Initializing MCP Server: mcp-framework-server@0.0.1
+[2025-03-21T15:32:38.380Z] [DEBUG] Initialized ToolLoader with directory: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools
+[2025-03-21T15:32:38.381Z] [DEBUG] Initialized PromptLoader with directory: E:\PROJECTS\letta tools\mcp-framework-server\dist\prompts
+[2025-03-21T15:32:38.381Z] [DEBUG] Initialized ResourceLoader with directory: E:\PROJECTS\letta tools\mcp-framework-server\dist\resources
+[2025-03-21T15:32:38.381Z] [DEBUG] Looking for tools in: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools
+[2025-03-21T15:32:38.381Z] [DEBUG] Looking for prompts in: E:\PROJECTS\letta tools\mcp-framework-server\dist\prompts
+[2025-03-21T15:32:38.381Z] [DEBUG] Looking for resources in: E:\PROJECTS\letta tools\mcp-framework-server\dist\resources
+[2025-03-21T15:32:38.382Z] [DEBUG] Attempting to load tools from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools
+[2025-03-21T15:32:38.384Z] [DEBUG] Found files in directory: BookstackCreateBookTool.d.ts, BookstackCreateBookTool.js, BookstackCreatePageTool.d.ts, BookstackCreatePageTool.js, BookstackListBooksTool.d.ts, BookstackListBooksTool.js, BookstackToolBase.d.ts, BookstackToolBase.js, create_book.py, create_bookshelf.py, create_chapter.py, create_page.py, delete_book.py, delete_bookshelf.py, delete_chapter.py, delete_page.py, ExampleTool.d.ts, ExampleTool.js, ExampleToolTool.d.ts, ExampleToolTool.js, list_books.py, list_bookshelves.py, list_chapters.py, list_pages.py, read_book.py, read_bookshelf.py, read_chapter.py, read_page.py, test_tools.py, update_book.py, update_bookshelf.py, update_chapter.py, update_page.py, upload_all_tools.py
+[2025-03-21T15:32:38.385Z] [DEBUG] Checking file BookstackCreateBookTool.js: included
+[2025-03-21T15:32:38.385Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\BookstackCreateBookTool.js
+[2025-03-21T15:32:38.387Z] [DEBUG] Validated tool: bookstack_create_book
+[2025-03-21T15:32:38.387Z] [DEBUG] Checking file BookstackCreatePageTool.js: included
+[2025-03-21T15:32:38.387Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\BookstackCreatePageTool.js
+[2025-03-21T15:32:38.389Z] [DEBUG] Validated tool: bookstack_create_page
+[2025-03-21T15:32:38.389Z] [DEBUG] Checking file BookstackListBooksTool.js: included
+[2025-03-21T15:32:38.389Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\BookstackListBooksTool.js
+[2025-03-21T15:32:38.390Z] [DEBUG] Validated tool: bookstack_list_books
+[2025-03-21T15:32:38.390Z] [DEBUG] Checking file BookstackToolBase.js: included
+[2025-03-21T15:32:38.390Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\BookstackToolBase.js
+[2025-03-21T15:32:38.391Z] [WARN] Invalid tool found: missing required properties
+[2025-03-21T15:32:38.391Z] [DEBUG] Checking file ExampleTool.js: included
+[2025-03-21T15:32:38.391Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\ExampleTool.js
+[2025-03-21T15:32:38.395Z] [DEBUG] Validated tool: example_tool
+[2025-03-21T15:32:38.395Z] [DEBUG] Checking file ExampleToolTool.js: included
+[2025-03-21T15:32:38.395Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\ExampleToolTool.js
+[2025-03-21T15:32:38.396Z] [DEBUG] Validated tool: example_tool
+[2025-03-21T15:32:38.396Z] [DEBUG] Successfully loaded 5 tools: bookstack_create_book, bookstack_create_page, bookstack_list_books, example_tool, example_tool
+[2025-03-21T15:32:38.396Z] [DEBUG] Attempting to load prompts from: E:\PROJECTS\letta tools\mcp-framework-server\dist\prompts
+[2025-03-21T15:32:38.397Z] [DEBUG] No prompts directory found
+[2025-03-21T15:32:38.397Z] [DEBUG] Attempting to load resources from: E:\PROJECTS\letta tools\mcp-framework-server\dist\resources
+[2025-03-21T15:32:38.397Z] [DEBUG] No resources directory found
+[2025-03-21T15:32:38.401Z] [DEBUG] No prompts directory found
+[2025-03-21T15:32:38.402Z] [DEBUG] No resources directory found
+[2025-03-21T15:32:38.402Z] [DEBUG] Creating MCP Server instance
+[2025-03-21T15:32:38.403Z] [DEBUG] Server created with capabilities: {"tools":{"enabled":true}}
+[2025-03-21T15:32:38.404Z] [INFO] Starting transport...
+[2025-03-21T15:32:38.404Z] [DEBUG] Creating transport: sse
+[2025-03-21T15:32:38.405Z] [DEBUG] SSE transport configured with: {"port":8080,"endpoint":"/sse","messageEndpoint":"/messages","maxMessageSize":"4mb","headers":{"Cache-Control":"no-cache","Connection":"keep-alive"},"cors":{"allowOrigin":"*","allowMethods":"GET, POST, OPTIONS","allowHeaders":"Content-Type, Authorization, x-api-key","exposeHeaders":"Content-Type, Authorization, x-api-key","maxAge":"86400"}}
+[2025-03-21T15:32:38.409Z] [INFO] SSE transport listening on port 8080
+[2025-03-21T15:32:38.409Z] [INFO] Transport connected successfully
+[2025-03-21T15:32:38.409Z] [INFO] Started mcp-framework-server@0.0.1
+[2025-03-21T15:32:38.409Z] [INFO] Transport: sse
+[2025-03-21T15:32:38.410Z] [INFO] Tools (5): bookstack_create_book, bookstack_create_page, bookstack_list_books, example_tool
+[2025-03-21T15:32:38.410Z] [INFO] Server running and ready for connections
+[2025-03-21T15:32:40.055Z] [DEBUG] Incoming request: GET /sse
+[2025-03-21T15:32:40.056Z] [DEBUG] Setting up SSE connection for session: 24e0ceb2-4747-4de7-92ab-5f13b9a4de48
+[2025-03-21T15:32:40.056Z] [DEBUG] SSE headers set: {"Content-Type":"text/event-stream","Cache-Control":"no-cache","Connection":"keep-alive","Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET, POST, OPTIONS","Access-Control-Allow-Headers":"Content-Type, Authorization, x-api-key","Access-Control-Expose-Headers":"Content-Type, Authorization, x-api-key"}
+[2025-03-21T15:32:40.057Z] [DEBUG] Socket optimized for SSE connection
+[2025-03-21T15:32:40.057Z] [DEBUG] Sending endpoint URL: /messages?sessionId=24e0ceb2-4747-4de7-92ab-5f13b9a4de48
+[2025-03-21T15:32:40.058Z] [DEBUG] Sending initial keep-alive
+[2025-03-21T15:32:40.058Z] [INFO] SSE connection established successfully for session: 24e0ceb2-4747-4de7-92ab-5f13b9a4de48
+[2025-03-21T15:32:55.061Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:33:10.071Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:33:25.073Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:33:40.084Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:33:55.089Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:34:10.105Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:34:25.112Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:34:40.121Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:34:41.428Z] [DEBUG] Incoming request: POST /messages?sessionId=24e0ceb2-4747-4de7-92ab-5f13b9a4de48
+[2025-03-21T15:34:41.444Z] [DEBUG] Received message: {"method":"tools/call","params":{"name":"bookstack_create_page","arguments":{"name":"Test Page from MCP Framework","book_id":"41","markdown":"# Test Page\n\nThis is a test page created using the MCP framework.\n\n## Features\n\n- Created via MCP\n- Uses Markdown formatting\n- Successfully demonstrates the fixed tools"}},"jsonrpc":"2.0","id":8}
+[2025-03-21T15:34:41.445Z] [DEBUG] Parsed message - ID: 8, Method: tools/call
+[2025-03-21T15:34:41.445Z] [DEBUG] Processing RPC message: {"id":8,"method":"tools/call","params":{"name":"bookstack_create_page","arguments":{"name":"Test Page from MCP Framework","book_id":"41","markdown":"# Test Page\n\nThis is a test page created using the MCP framework.\n\n## Features\n\n- Created via MCP\n- Uses Markdown formatting\n- Successfully demonstrates the fixed tools"}}}
+[2025-03-21T15:34:41.447Z] [DEBUG] Tool call request received for: bookstack_create_page
+[2025-03-21T15:34:41.448Z] [DEBUG] Tool call arguments: {"name":"Test Page from MCP Framework","book_id":"41","markdown":"# Test Page\n\nThis is a test page created using the MCP framework.\n\n## Features\n\n- Created via MCP\n- Uses Markdown formatting\n- Successfully demonstrates the fixed tools"}
+[2025-03-21T15:34:41.448Z] [DEBUG] Executing tool: bookstack_create_page
+[2025-03-21T15:34:41.449Z] [DEBUG] Successfully processed message 8
+[2025-03-21T15:34:42.920Z] [DEBUG] Tool execution successful: {"content":[{"type":"text","text":"\"{\\\"id\\\": 82, \\\"book_id\\\": 41, \\\"chapter_id\\\": 0, \\\"name\\\": \\\"Test Page from MCP Framework\\\", \\\"slug\\\": \\\"test-page-from-mcp-framework\\\", \\\"html\\\": \\\"<h1 id=\\\\\\\"bkmrk-test-page\\\\\\\">Test Page</h1>\\\\n<p id=\\\\\\\"bkmrk-this-is-a-test-page-\\\\\\\">This is a test page created using the MCP framework.</p>\\\\n<h2 id=\\\\\\\"bkmrk-features\\\\\\\">Features</h2>\\\\n<ul id=\\\\\\\"bkmrk-created-via-mcp-uses\\\\\\\">\\\\n<li>Created via MCP</li>\\\\n<li>Uses Markdown formatting</li>\\\\n<li>Successfully demonstrates the fixed tools</li>\\\\n</ul>\\\\n\\\", \\\"priority\\\": 2, \\\"created_at\\\": \\\"2025-03-21T15:34:42.000000Z\\\", \\\"updated_at\\\": \\\"2025-03-21T15:34:43.000000Z\\\", \\\"created_by\\\": {\\\"id\\\": 1, \\\"name\\\": \\\"Admin\\\", \\\"slug\\\": \\\"admin\\\"}, \\\"updated_by\\\": {\\\"id\\\": 1, \\\"name\\\": \\\"Admin\\\", \\\"slug\\\": \\\"admin\\\"}, \\\"draft\\\": false, \\\"markdown\\\": \\\"# Test Page\\\\n\\\\nThis is a test page created using the MCP framework.\\\\n\\\\n## Features\\\\n\\\\n- Created via MCP\\\\n- Uses Markdown formatting\\\\n- Successfully demonstrates the fixed tools\\\", \\\"revision_count\\\": 1, \\\"template\\\": false, \\\"owned_by\\\": {\\\"id\\\": 1, \\\"name\\\": \\\"Admin\\\", \\\"slug\\\": \\\"admin\\\"}, \\\"editor\\\": \\\"markdown\\\", \\\"raw_html\\\": \\\"<h1 id=\\\\\\\"bkmrk-test-page\\\\\\\">Test Page</h1>\\\\n<p id=\\\\\\\"bkmrk-this-is-a-test-page-\\\\\\\">This is a test page created using the MCP framework.</p>\\\\n<h2 id=\\\\\\\"bkmrk-features\\\\\\\">Features</h2>\\\\n<ul id=\\\\\\\"bkmrk-created-via-mcp-uses\\\\\\\">\\\\n<li>Created via MCP</li>\\\\n<li>Uses Markdown formatting</li>\\\\n<li>Successfully demonstrates the fixed tools</li>\\\\n</ul>\\\\n\\\", \\\"tags\\\": []}\\r\\n\""}]}
+[2025-03-21T15:34:42.920Z] [DEBUG] Transport sending message: {"result":{"content":[{"type":"text","text":"\"{\\\"id\\\": 82, \\\"book_id\\\": 41, \\\"chapter_id\\\": 0, \\\"name\\\": \\\"Test Page from MCP Framework\\\", \\\"slug\\\": \\\"test-page-from-mcp-framework\\\", \\\"html\\\": \\\"<h1 id=\\\\\\\"bkmrk-test-page\\\\\\\">Test Page</h1>\\\\n<p id=\\\\\\\"bkmrk-this-is-a-test-page-\\\\\\\">This is a test page created using the MCP framework.</p>\\\\n<h2 id=\\\\\\\"bkmrk-features\\\\\\\">Features</h2>\\\\n<ul id=\\\\\\\"bkmrk-created-via-mcp-uses\\\\\\\">\\\\n<li>Created via MCP</li>\\\\n<li>Uses Markdown formatting</li>\\\\n<li>Successfully demonstrates the fixed tools</li>\\\\n</ul>\\\\n\\\", \\\"priority\\\": 2, \\\"created_at\\\": \\\"2025-03-21T15:34:42.000000Z\\\", \\\"updated_at\\\": \\\"2025-03-21T15:34:43.000000Z\\\", \\\"created_by\\\": {\\\"id\\\": 1, \\\"name\\\": \\\"Admin\\\", \\\"slug\\\": \\\"admin\\\"}, \\\"updated_by\\\": {\\\"id\\\": 1, \\\"name\\\": \\\"Admin\\\", \\\"slug\\\": \\\"admin\\\"}, \\\"draft\\\": false, \\\"markdown\\\": \\\"# Test Page\\\\n\\\\nThis is a test page created using the MCP framework.\\\\n\\\\n## Features\\\\n\\\\n- Created via MCP\\\\n- Uses Markdown formatting\\\\n- Successfully demonstrates the fixed tools\\\", \\\"revision_count\\\": 1, \\\"template\\\": false, \\\"owned_by\\\": {\\\"id\\\": 1, \\\"name\\\": \\\"Admin\\\", \\\"slug\\\": \\\"admin\\\"}, \\\"editor\\\": \\\"markdown\\\", \\\"raw_html\\\": \\\"<h1 id=\\\\\\\"bkmrk-test-page\\\\\\\">Test Page</h1>\\\\n<p id=\\\\\\\"bkmrk-this-is-a-test-page-\\\\\\\">This is a test page created using the MCP framework.</p>\\\\n<h2 id=\\\\\\\"bkmrk-features\\\\\\\">Features</h2>\\\\n<ul id=\\\\\\\"bkmrk-created-via-mcp-uses\\\\\\\">\\\\n<li>Created via MCP</li>\\\\n<li>Uses Markdown formatting</li>\\\\n<li>Successfully demonstrates the fixed tools</li>\\\\n</ul>\\\\n\\\", \\\"tags\\\": []}\\r\\n\""}]},"jsonrpc":"2.0","id":8}
+[2025-03-21T15:34:55.133Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:35:10.142Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:35:25.151Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:35:40.156Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:35:55.166Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:36:10.170Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:36:25.185Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:36:40.198Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:36:55.200Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:37:10.211Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:37:25.215Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:37:40.227Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:37:55.234Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:38:10.249Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:38:25.262Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:38:40.268Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:38:55.283Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:39:10.294Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:39:25.304Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:39:40.318Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:39:55.327Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:40:10.330Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:40:25.342Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:40:40.343Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:40:55.348Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:41:10.357Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:41:25.367Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:41:40.371Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:41:55.378Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:42:10.378Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:42:25.388Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:42:40.398Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:42:55.412Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:43:10.415Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:43:25.423Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:43:40.424Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:43:55.431Z] [DEBUG] Sending keep-alive ping

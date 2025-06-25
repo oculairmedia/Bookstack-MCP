@@ -1,0 +1,98 @@
+[2025-03-21T08:19:00.322Z] [DEBUG] Successfully read package.json from project root: E:\PROJECTS\letta tools\mcp-framework-server\package.json
+[2025-03-21T08:19:00.322Z] [INFO] Using name from package.json: mcp-framework-server
+[2025-03-21T08:19:00.322Z] [DEBUG] Successfully read package.json from project root: E:\PROJECTS\letta tools\mcp-framework-server\package.json
+[2025-03-21T08:19:00.323Z] [INFO] Using version from package.json: 0.0.1
+[2025-03-21T08:19:00.323Z] [INFO] Initializing MCP Server: mcp-framework-server@0.0.1
+[2025-03-21T08:19:00.323Z] [DEBUG] Initialized ToolLoader with directory: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools
+[2025-03-21T08:19:00.323Z] [DEBUG] Initialized PromptLoader with directory: E:\PROJECTS\letta tools\mcp-framework-server\dist\prompts
+[2025-03-21T08:19:00.324Z] [DEBUG] Initialized ResourceLoader with directory: E:\PROJECTS\letta tools\mcp-framework-server\dist\resources
+[2025-03-21T08:19:00.324Z] [DEBUG] Looking for tools in: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools
+[2025-03-21T08:19:00.324Z] [DEBUG] Looking for prompts in: E:\PROJECTS\letta tools\mcp-framework-server\dist\prompts
+[2025-03-21T08:19:00.324Z] [DEBUG] Looking for resources in: E:\PROJECTS\letta tools\mcp-framework-server\dist\resources
+[2025-03-21T08:19:00.325Z] [DEBUG] Attempting to load tools from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools
+[2025-03-21T08:19:00.326Z] [DEBUG] Found files in directory: ExampleTool.d.ts, ExampleTool.js, ExampleToolTool.d.ts, ExampleToolTool.js
+[2025-03-21T08:19:00.326Z] [DEBUG] Checking file ExampleTool.js: included
+[2025-03-21T08:19:00.326Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\ExampleTool.js
+[2025-03-21T08:19:00.332Z] [DEBUG] Validated tool: example_tool
+[2025-03-21T08:19:00.333Z] [DEBUG] Checking file ExampleToolTool.js: included
+[2025-03-21T08:19:00.334Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\ExampleToolTool.js
+[2025-03-21T08:19:00.343Z] [DEBUG] Validated tool: example_tool
+[2025-03-21T08:19:00.344Z] [DEBUG] Successfully loaded 2 tools: example_tool, example_tool
+[2025-03-21T08:19:00.344Z] [DEBUG] Attempting to load prompts from: E:\PROJECTS\letta tools\mcp-framework-server\dist\prompts
+[2025-03-21T08:19:00.346Z] [DEBUG] No prompts directory found
+[2025-03-21T08:19:00.346Z] [DEBUG] Attempting to load resources from: E:\PROJECTS\letta tools\mcp-framework-server\dist\resources
+[2025-03-21T08:19:00.346Z] [DEBUG] No resources directory found
+[2025-03-21T08:19:00.347Z] [DEBUG] No prompts directory found
+[2025-03-21T08:19:00.349Z] [DEBUG] No resources directory found
+[2025-03-21T08:19:00.349Z] [DEBUG] Creating MCP Server instance
+[2025-03-21T08:19:00.350Z] [DEBUG] Server created with capabilities: {"tools":{"enabled":true}}
+[2025-03-21T08:19:00.350Z] [INFO] Starting transport...
+[2025-03-21T08:19:00.351Z] [DEBUG] Creating transport: sse
+[2025-03-21T08:19:00.352Z] [DEBUG] SSE transport configured with: {"port":8080,"endpoint":"/sse","messageEndpoint":"/messages","maxMessageSize":"4mb","headers":{"Cache-Control":"no-cache","Connection":"keep-alive"},"cors":{"allowOrigin":"*","allowMethods":"GET, POST, OPTIONS","allowHeaders":"Content-Type, Authorization, x-api-key","exposeHeaders":"Content-Type, Authorization, x-api-key","maxAge":"86400"}}
+[2025-03-21T08:19:00.361Z] [INFO] SSE transport listening on port 8080
+[2025-03-21T08:19:00.362Z] [INFO] Transport connected successfully
+[2025-03-21T08:19:00.362Z] [INFO] Started mcp-framework-server@0.0.1
+[2025-03-21T08:19:00.362Z] [INFO] Transport: sse
+[2025-03-21T08:19:00.362Z] [INFO] Tools (2): example_tool
+[2025-03-21T08:19:00.363Z] [INFO] Server running and ready for connections
+[2025-03-21T08:19:02.388Z] [DEBUG] Incoming request: GET /sse
+[2025-03-21T08:19:02.389Z] [DEBUG] Setting up SSE connection for session: 8c77ae96-8ec1-48cc-ab3d-245ce0698734
+[2025-03-21T08:19:02.389Z] [DEBUG] SSE headers set: {"Content-Type":"text/event-stream","Cache-Control":"no-cache","Connection":"keep-alive","Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET, POST, OPTIONS","Access-Control-Allow-Headers":"Content-Type, Authorization, x-api-key","Access-Control-Expose-Headers":"Content-Type, Authorization, x-api-key"}
+[2025-03-21T08:19:02.389Z] [DEBUG] Socket optimized for SSE connection
+[2025-03-21T08:19:02.390Z] [DEBUG] Sending endpoint URL: /messages?sessionId=8c77ae96-8ec1-48cc-ab3d-245ce0698734
+[2025-03-21T08:19:02.391Z] [DEBUG] Sending initial keep-alive
+[2025-03-21T08:19:02.391Z] [INFO] SSE connection established successfully for session: 8c77ae96-8ec1-48cc-ab3d-245ce0698734
+[2025-03-21T08:19:16.134Z] [INFO] SSE connection closed for session: 8c77ae96-8ec1-48cc-ab3d-245ce0698734
+[2025-03-21T08:19:16.135Z] [DEBUG] Incoming request: GET /sse
+[2025-03-21T08:19:16.135Z] [DEBUG] Setting up SSE connection for session: 8c77ae96-8ec1-48cc-ab3d-245ce0698734
+[2025-03-21T08:19:16.136Z] [DEBUG] SSE headers set: {"Content-Type":"text/event-stream","Cache-Control":"no-cache","Connection":"keep-alive","Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET, POST, OPTIONS","Access-Control-Allow-Headers":"Content-Type, Authorization, x-api-key","Access-Control-Expose-Headers":"Content-Type, Authorization, x-api-key"}
+[2025-03-21T08:19:16.136Z] [DEBUG] Socket optimized for SSE connection
+[2025-03-21T08:19:16.136Z] [DEBUG] Sending endpoint URL: /messages?sessionId=8c77ae96-8ec1-48cc-ab3d-245ce0698734
+[2025-03-21T08:19:16.136Z] [DEBUG] Sending initial keep-alive
+[2025-03-21T08:19:16.136Z] [INFO] SSE connection established successfully for session: 8c77ae96-8ec1-48cc-ab3d-245ce0698734
+[2025-03-21T08:19:16.140Z] [DEBUG] Incoming request: POST /messages?sessionId=8c77ae96-8ec1-48cc-ab3d-245ce0698734
+[2025-03-21T08:19:16.346Z] [DEBUG] Received message: {"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"Roo Code","version":"3.9.2"}},"jsonrpc":"2.0","id":0}
+[2025-03-21T08:19:16.347Z] [DEBUG] Parsed message - ID: 0, Method: initialize
+[2025-03-21T08:19:16.347Z] [DEBUG] Processing RPC message: {"id":0,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"Roo Code","version":"3.9.2"}}}
+[2025-03-21T08:19:16.349Z] [DEBUG] Successfully processed message 0
+[2025-03-21T08:19:16.350Z] [DEBUG] Transport sending message: {"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{"enabled":true}},"serverInfo":{"name":"mcp-framework-server","version":"0.0.1"}},"jsonrpc":"2.0","id":0}
+[2025-03-21T08:19:16.369Z] [DEBUG] Incoming request: POST /messages?sessionId=8c77ae96-8ec1-48cc-ab3d-245ce0698734
+[2025-03-21T08:19:16.370Z] [DEBUG] Received message: {"method":"notifications/initialized","jsonrpc":"2.0"}
+[2025-03-21T08:19:16.370Z] [DEBUG] Parsed message - ID: undefined, Method: notifications/initialized
+[2025-03-21T08:19:16.370Z] [DEBUG] Processing RPC message: {"method":"notifications/initialized"}
+[2025-03-21T08:19:16.370Z] [DEBUG] Transport sending message: {"jsonrpc":"2.0","error":{"code":-32601,"message":"Method not found"}}
+[2025-03-21T08:19:16.371Z] [DEBUG] Successfully processed message undefined
+[2025-03-21T08:19:16.376Z] [DEBUG] Incoming request: POST /messages?sessionId=8c77ae96-8ec1-48cc-ab3d-245ce0698734
+[2025-03-21T08:19:16.376Z] [DEBUG] Received message: {"method":"tools/list","jsonrpc":"2.0","id":1}
+[2025-03-21T08:19:16.377Z] [DEBUG] Parsed message - ID: 1, Method: tools/list
+[2025-03-21T08:19:16.377Z] [DEBUG] Processing RPC message: {"id":1,"method":"tools/list"}
+[2025-03-21T08:19:16.377Z] [DEBUG] Received ListTools request: {"method":"tools/list"}
+[2025-03-21T08:19:16.377Z] [DEBUG] Found 1 tools to return
+[2025-03-21T08:19:16.377Z] [DEBUG] Tool definitions: [{"name":"example_tool","description":"An example tool that processes messages","inputSchema":{"type":"object","properties":{"message":{"type":"string","description":"Message to process"}}}}]
+[2025-03-21T08:19:16.377Z] [DEBUG] Sending ListTools response: {"tools":[{"name":"example_tool","description":"An example tool that processes messages","inputSchema":{"type":"object","properties":{"message":{"type":"string","description":"Message to process"}}}}]}
+[2025-03-21T08:19:16.378Z] [DEBUG] Successfully processed message 1
+[2025-03-21T08:19:16.378Z] [DEBUG] Transport sending message: {"result":{"tools":[{"name":"example_tool","description":"An example tool that processes messages","inputSchema":{"type":"object","properties":{"message":{"type":"string","description":"Message to process"}}}}]},"jsonrpc":"2.0","id":1}
+[2025-03-21T08:19:16.383Z] [DEBUG] Incoming request: POST /messages?sessionId=8c77ae96-8ec1-48cc-ab3d-245ce0698734
+[2025-03-21T08:19:16.383Z] [DEBUG] Received message: {"method":"resources/list","jsonrpc":"2.0","id":2}
+[2025-03-21T08:19:16.383Z] [DEBUG] Parsed message - ID: 2, Method: resources/list
+[2025-03-21T08:19:16.384Z] [DEBUG] Processing RPC message: {"id":2,"method":"resources/list"}
+[2025-03-21T08:19:16.384Z] [DEBUG] Transport sending message: {"jsonrpc":"2.0","id":2,"error":{"code":-32601,"message":"Method not found"}}
+[2025-03-21T08:19:16.384Z] [DEBUG] Successfully processed message 2
+[2025-03-21T08:19:16.388Z] [DEBUG] Incoming request: POST /messages?sessionId=8c77ae96-8ec1-48cc-ab3d-245ce0698734
+[2025-03-21T08:19:16.389Z] [DEBUG] Received message: {"method":"resources/templates/list","jsonrpc":"2.0","id":3}
+[2025-03-21T08:19:16.389Z] [DEBUG] Parsed message - ID: 3, Method: resources/templates/list
+[2025-03-21T08:19:16.389Z] [DEBUG] Processing RPC message: {"id":3,"method":"resources/templates/list"}
+[2025-03-21T08:19:16.389Z] [DEBUG] Transport sending message: {"jsonrpc":"2.0","id":3,"error":{"code":-32601,"message":"Method not found"}}
+[2025-03-21T08:19:16.389Z] [DEBUG] Successfully processed message 3
+[2025-03-21T08:19:31.148Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:19:46.161Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:20:01.172Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:20:16.175Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:20:31.181Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:20:46.190Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:21:01.198Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:21:16.209Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:21:31.221Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:21:46.221Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:22:01.236Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T08:22:16.240Z] [DEBUG] Sending keep-alive ping

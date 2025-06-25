@@ -1,0 +1,125 @@
+[2025-03-21T15:25:48.029Z] [DEBUG] Successfully read package.json from project root: E:\PROJECTS\letta tools\mcp-framework-server\package.json
+[2025-03-21T15:25:48.029Z] [INFO] Using name from package.json: mcp-framework-server
+[2025-03-21T15:25:48.030Z] [DEBUG] Successfully read package.json from project root: E:\PROJECTS\letta tools\mcp-framework-server\package.json
+[2025-03-21T15:25:48.030Z] [INFO] Using version from package.json: 0.0.1
+[2025-03-21T15:25:48.031Z] [INFO] Initializing MCP Server: mcp-framework-server@0.0.1
+[2025-03-21T15:25:48.031Z] [DEBUG] Initialized ToolLoader with directory: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools
+[2025-03-21T15:25:48.031Z] [DEBUG] Initialized PromptLoader with directory: E:\PROJECTS\letta tools\mcp-framework-server\dist\prompts
+[2025-03-21T15:25:48.032Z] [DEBUG] Initialized ResourceLoader with directory: E:\PROJECTS\letta tools\mcp-framework-server\dist\resources
+[2025-03-21T15:25:48.032Z] [DEBUG] Looking for tools in: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools
+[2025-03-21T15:25:48.032Z] [DEBUG] Looking for prompts in: E:\PROJECTS\letta tools\mcp-framework-server\dist\prompts
+[2025-03-21T15:25:48.032Z] [DEBUG] Looking for resources in: E:\PROJECTS\letta tools\mcp-framework-server\dist\resources
+[2025-03-21T15:25:48.033Z] [DEBUG] Attempting to load tools from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools
+[2025-03-21T15:25:48.034Z] [DEBUG] Found files in directory: BookstackCreateBookTool.d.ts, BookstackCreateBookTool.js, BookstackCreatePageTool.d.ts, BookstackCreatePageTool.js, BookstackListBooksTool.d.ts, BookstackListBooksTool.js, BookstackToolBase.d.ts, BookstackToolBase.js, create_book.py, create_bookshelf.py, create_chapter.py, create_page.py, delete_book.py, delete_bookshelf.py, delete_chapter.py, delete_page.py, ExampleTool.d.ts, ExampleTool.js, ExampleToolTool.d.ts, ExampleToolTool.js, list_books.py, list_bookshelves.py, list_chapters.py, list_pages.py, read_book.py, read_bookshelf.py, read_chapter.py, read_page.py, test_tools.py, update_book.py, update_bookshelf.py, update_chapter.py, update_page.py, upload_all_tools.py
+[2025-03-21T15:25:48.035Z] [DEBUG] Checking file BookstackCreateBookTool.js: included
+[2025-03-21T15:25:48.035Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\BookstackCreateBookTool.js
+[2025-03-21T15:25:48.036Z] [DEBUG] Validated tool: bookstack_create_book
+[2025-03-21T15:25:48.036Z] [DEBUG] Checking file BookstackCreatePageTool.js: included
+[2025-03-21T15:25:48.036Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\BookstackCreatePageTool.js
+[2025-03-21T15:25:48.037Z] [DEBUG] Validated tool: bookstack_create_page
+[2025-03-21T15:25:48.037Z] [DEBUG] Checking file BookstackListBooksTool.js: included
+[2025-03-21T15:25:48.037Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\BookstackListBooksTool.js
+[2025-03-21T15:25:48.038Z] [DEBUG] Validated tool: bookstack_list_books
+[2025-03-21T15:25:48.038Z] [DEBUG] Checking file BookstackToolBase.js: included
+[2025-03-21T15:25:48.038Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\BookstackToolBase.js
+[2025-03-21T15:25:48.039Z] [WARN] Invalid tool found: missing required properties
+[2025-03-21T15:25:48.039Z] [DEBUG] Checking file ExampleTool.js: included
+[2025-03-21T15:25:48.039Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\ExampleTool.js
+[2025-03-21T15:25:48.042Z] [DEBUG] Validated tool: example_tool
+[2025-03-21T15:25:48.043Z] [DEBUG] Checking file ExampleToolTool.js: included
+[2025-03-21T15:25:48.043Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\ExampleToolTool.js
+[2025-03-21T15:25:48.043Z] [DEBUG] Validated tool: example_tool
+[2025-03-21T15:25:48.044Z] [DEBUG] Successfully loaded 5 tools: bookstack_create_book, bookstack_create_page, bookstack_list_books, example_tool, example_tool
+[2025-03-21T15:25:48.044Z] [DEBUG] Attempting to load prompts from: E:\PROJECTS\letta tools\mcp-framework-server\dist\prompts
+[2025-03-21T15:25:48.044Z] [DEBUG] No prompts directory found
+[2025-03-21T15:25:48.045Z] [DEBUG] Attempting to load resources from: E:\PROJECTS\letta tools\mcp-framework-server\dist\resources
+[2025-03-21T15:25:48.045Z] [DEBUG] No resources directory found
+[2025-03-21T15:25:48.045Z] [DEBUG] No prompts directory found
+[2025-03-21T15:25:48.046Z] [DEBUG] No resources directory found
+[2025-03-21T15:25:48.046Z] [DEBUG] Creating MCP Server instance
+[2025-03-21T15:25:48.047Z] [DEBUG] Server created with capabilities: {"tools":{"enabled":true}}
+[2025-03-21T15:25:48.047Z] [INFO] Starting transport...
+[2025-03-21T15:25:48.048Z] [DEBUG] Creating transport: sse
+[2025-03-21T15:25:48.049Z] [DEBUG] SSE transport configured with: {"port":8080,"endpoint":"/sse","messageEndpoint":"/messages","maxMessageSize":"4mb","headers":{"Cache-Control":"no-cache","Connection":"keep-alive"},"cors":{"allowOrigin":"*","allowMethods":"GET, POST, OPTIONS","allowHeaders":"Content-Type, Authorization, x-api-key","exposeHeaders":"Content-Type, Authorization, x-api-key","maxAge":"86400"}}
+[2025-03-21T15:25:48.053Z] [INFO] SSE transport listening on port 8080
+[2025-03-21T15:25:48.053Z] [INFO] Transport connected successfully
+[2025-03-21T15:25:48.053Z] [INFO] Started mcp-framework-server@0.0.1
+[2025-03-21T15:25:48.053Z] [INFO] Transport: sse
+[2025-03-21T15:25:48.053Z] [INFO] Tools (5): bookstack_create_book, bookstack_create_page, bookstack_list_books, example_tool
+[2025-03-21T15:25:48.054Z] [INFO] Server running and ready for connections
+[2025-03-21T15:25:49.121Z] [DEBUG] Incoming request: GET /sse
+[2025-03-21T15:25:49.122Z] [DEBUG] Setting up SSE connection for session: 06d10a60-4fc4-4960-8397-1ddf9328c604
+[2025-03-21T15:25:49.122Z] [DEBUG] SSE headers set: {"Content-Type":"text/event-stream","Cache-Control":"no-cache","Connection":"keep-alive","Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET, POST, OPTIONS","Access-Control-Allow-Headers":"Content-Type, Authorization, x-api-key","Access-Control-Expose-Headers":"Content-Type, Authorization, x-api-key"}
+[2025-03-21T15:25:49.122Z] [DEBUG] Socket optimized for SSE connection
+[2025-03-21T15:25:49.122Z] [DEBUG] Sending endpoint URL: /messages?sessionId=06d10a60-4fc4-4960-8397-1ddf9328c604
+[2025-03-21T15:25:49.124Z] [DEBUG] Sending initial keep-alive
+[2025-03-21T15:25:49.124Z] [INFO] SSE connection established successfully for session: 06d10a60-4fc4-4960-8397-1ddf9328c604
+[2025-03-21T15:25:55.737Z] [INFO] SSE connection closed for session: 06d10a60-4fc4-4960-8397-1ddf9328c604
+[2025-03-21T15:25:55.751Z] [DEBUG] Incoming request: GET /sse
+[2025-03-21T15:25:55.752Z] [DEBUG] Setting up SSE connection for session: 06d10a60-4fc4-4960-8397-1ddf9328c604
+[2025-03-21T15:25:55.752Z] [DEBUG] SSE headers set: {"Content-Type":"text/event-stream","Cache-Control":"no-cache","Connection":"keep-alive","Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET, POST, OPTIONS","Access-Control-Allow-Headers":"Content-Type, Authorization, x-api-key","Access-Control-Expose-Headers":"Content-Type, Authorization, x-api-key"}
+[2025-03-21T15:25:55.753Z] [DEBUG] Socket optimized for SSE connection
+[2025-03-21T15:25:55.753Z] [DEBUG] Sending endpoint URL: /messages?sessionId=06d10a60-4fc4-4960-8397-1ddf9328c604
+[2025-03-21T15:25:55.753Z] [DEBUG] Sending initial keep-alive
+[2025-03-21T15:25:55.754Z] [INFO] SSE connection established successfully for session: 06d10a60-4fc4-4960-8397-1ddf9328c604
+[2025-03-21T15:25:55.761Z] [DEBUG] Incoming request: POST /messages?sessionId=06d10a60-4fc4-4960-8397-1ddf9328c604
+[2025-03-21T15:25:56.039Z] [DEBUG] Received message: {"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"Roo Code","version":"3.9.2"}},"jsonrpc":"2.0","id":0}
+[2025-03-21T15:25:56.040Z] [DEBUG] Parsed message - ID: 0, Method: initialize
+[2025-03-21T15:25:56.040Z] [DEBUG] Processing RPC message: {"id":0,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"Roo Code","version":"3.9.2"}}}
+[2025-03-21T15:25:56.042Z] [DEBUG] Successfully processed message 0
+[2025-03-21T15:25:56.043Z] [DEBUG] Transport sending message: {"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{"enabled":true}},"serverInfo":{"name":"mcp-framework-server","version":"0.0.1"}},"jsonrpc":"2.0","id":0}
+[2025-03-21T15:25:56.069Z] [DEBUG] Incoming request: POST /messages?sessionId=06d10a60-4fc4-4960-8397-1ddf9328c604
+[2025-03-21T15:25:56.070Z] [DEBUG] Received message: {"method":"notifications/initialized","jsonrpc":"2.0"}
+[2025-03-21T15:25:56.070Z] [DEBUG] Parsed message - ID: undefined, Method: notifications/initialized
+[2025-03-21T15:25:56.070Z] [DEBUG] Processing RPC message: {"method":"notifications/initialized"}
+[2025-03-21T15:25:56.070Z] [DEBUG] Transport sending message: {"jsonrpc":"2.0","error":{"code":-32601,"message":"Method not found"}}
+[2025-03-21T15:25:56.071Z] [DEBUG] Successfully processed message undefined
+[2025-03-21T15:25:56.075Z] [DEBUG] Incoming request: POST /messages?sessionId=06d10a60-4fc4-4960-8397-1ddf9328c604
+[2025-03-21T15:25:56.075Z] [DEBUG] Received message: {"method":"tools/list","jsonrpc":"2.0","id":1}
+[2025-03-21T15:25:56.076Z] [DEBUG] Parsed message - ID: 1, Method: tools/list
+[2025-03-21T15:25:56.076Z] [DEBUG] Processing RPC message: {"id":1,"method":"tools/list"}
+[2025-03-21T15:25:56.076Z] [DEBUG] Received ListTools request: {"method":"tools/list"}
+[2025-03-21T15:25:56.076Z] [DEBUG] Found 4 tools to return
+[2025-03-21T15:25:56.077Z] [DEBUG] Tool definitions: [{"name":"bookstack_create_book","description":"Creates a new book in Bookstack","inputSchema":{"type":"object","properties":{"name":{"type":"string","description":"The name of the book"},"description":{"type":"string","description":"A description of the book"},"tags":{"type":"string","description":"A list of tag objects (each with 'name' and 'value')"},"image_id":{"type":"string","description":"The ID of an image to use as the cover"}}}},{"name":"bookstack_create_page","description":"Creates a new page in Bookstack","inputSchema":{"type":"object","properties":{"name":{"type":"string","description":"The name of the page"},"book_id":{"type":"string","description":"The ID of the book to create the page in"},"chapter_id":{"type":"string","description":"The ID of the chapter to create the page in"},"markdown":{"type":"string","description":"The page content in Markdown format"},"html":{"type":"string","description":"The page content in HTML format"},"tags":{"type":"string","description":"A list of tag objects (each with 'name' and 'value')"},"priority":{"type":"string","description":"Page priority"}}}},{"name":"bookstack_list_books","description":"Lists all books in Bookstack with pagination support","inputSchema":{"type":"object","properties":{"offset":{"type":"string","description":"Number of records to skip"},"count":{"type":"string","description":"Number of records to take"}}}},{"name":"example_tool","description":"An example tool that processes messages","inputSchema":{"type":"object","properties":{"message":{"type":"string","description":"Message to process"}}}}]
+[2025-03-21T15:25:56.077Z] [DEBUG] Sending ListTools response: {"tools":[{"name":"bookstack_create_book","description":"Creates a new book in Bookstack","inputSchema":{"type":"object","properties":{"name":{"type":"string","description":"The name of the book"},"description":{"type":"string","description":"A description of the book"},"tags":{"type":"string","description":"A list of tag objects (each with 'name' and 'value')"},"image_id":{"type":"string","description":"The ID of an image to use as the cover"}}}},{"name":"bookstack_create_page","description":"Creates a new page in Bookstack","inputSchema":{"type":"object","properties":{"name":{"type":"string","description":"The name of the page"},"book_id":{"type":"string","description":"The ID of the book to create the page in"},"chapter_id":{"type":"string","description":"The ID of the chapter to create the page in"},"markdown":{"type":"string","description":"The page content in Markdown format"},"html":{"type":"string","description":"The page content in HTML format"},"tags":{"type":"string","description":"A list of tag objects (each with 'name' and 'value')"},"priority":{"type":"string","description":"Page priority"}}}},{"name":"bookstack_list_books","description":"Lists all books in Bookstack with pagination support","inputSchema":{"type":"object","properties":{"offset":{"type":"string","description":"Number of records to skip"},"count":{"type":"string","description":"Number of records to take"}}}},{"name":"example_tool","description":"An example tool that processes messages","inputSchema":{"type":"object","properties":{"message":{"type":"string","description":"Message to process"}}}}]}
+[2025-03-21T15:25:56.077Z] [DEBUG] Successfully processed message 1
+[2025-03-21T15:25:56.078Z] [DEBUG] Transport sending message: {"result":{"tools":[{"name":"bookstack_create_book","description":"Creates a new book in Bookstack","inputSchema":{"type":"object","properties":{"name":{"type":"string","description":"The name of the book"},"description":{"type":"string","description":"A description of the book"},"tags":{"type":"string","description":"A list of tag objects (each with 'name' and 'value')"},"image_id":{"type":"string","description":"The ID of an image to use as the cover"}}}},{"name":"bookstack_create_page","description":"Creates a new page in Bookstack","inputSchema":{"type":"object","properties":{"name":{"type":"string","description":"The name of the page"},"book_id":{"type":"string","description":"The ID of the book to create the page in"},"chapter_id":{"type":"string","description":"The ID of the chapter to create the page in"},"markdown":{"type":"string","description":"The page content in Markdown format"},"html":{"type":"string","description":"The page content in HTML format"},"tags":{"type":"string","description":"A list of tag objects (each with 'name' and 'value')"},"priority":{"type":"string","description":"Page priority"}}}},{"name":"bookstack_list_books","description":"Lists all books in Bookstack with pagination support","inputSchema":{"type":"object","properties":{"offset":{"type":"string","description":"Number of records to skip"},"count":{"type":"string","description":"Number of records to take"}}}},{"name":"example_tool","description":"An example tool that processes messages","inputSchema":{"type":"object","properties":{"message":{"type":"string","description":"Message to process"}}}}]},"jsonrpc":"2.0","id":1}
+[2025-03-21T15:25:56.083Z] [DEBUG] Incoming request: POST /messages?sessionId=06d10a60-4fc4-4960-8397-1ddf9328c604
+[2025-03-21T15:25:56.084Z] [DEBUG] Received message: {"method":"resources/list","jsonrpc":"2.0","id":2}
+[2025-03-21T15:25:56.084Z] [DEBUG] Parsed message - ID: 2, Method: resources/list
+[2025-03-21T15:25:56.084Z] [DEBUG] Processing RPC message: {"id":2,"method":"resources/list"}
+[2025-03-21T15:25:56.085Z] [DEBUG] Transport sending message: {"jsonrpc":"2.0","id":2,"error":{"code":-32601,"message":"Method not found"}}
+[2025-03-21T15:25:56.085Z] [DEBUG] Successfully processed message 2
+[2025-03-21T15:25:56.090Z] [DEBUG] Incoming request: POST /messages?sessionId=06d10a60-4fc4-4960-8397-1ddf9328c604
+[2025-03-21T15:25:56.091Z] [DEBUG] Received message: {"method":"resources/templates/list","jsonrpc":"2.0","id":3}
+[2025-03-21T15:25:56.091Z] [DEBUG] Parsed message - ID: 3, Method: resources/templates/list
+[2025-03-21T15:25:56.091Z] [DEBUG] Processing RPC message: {"id":3,"method":"resources/templates/list"}
+[2025-03-21T15:25:56.091Z] [DEBUG] Transport sending message: {"jsonrpc":"2.0","id":3,"error":{"code":-32601,"message":"Method not found"}}
+[2025-03-21T15:25:56.091Z] [DEBUG] Successfully processed message 3
+[2025-03-21T15:26:10.757Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:26:25.770Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:26:40.777Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:26:55.780Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:27:10.790Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:27:25.796Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:27:40.799Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:27:55.801Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:28:10.806Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:28:17.598Z] [DEBUG] Incoming request: POST /messages?sessionId=06d10a60-4fc4-4960-8397-1ddf9328c604
+[2025-03-21T15:28:17.599Z] [DEBUG] Received message: {"method":"tools/call","params":{"name":"bookstack_list_books","arguments":{"offset":"0","count":"10"}},"jsonrpc":"2.0","id":4}
+[2025-03-21T15:28:17.599Z] [DEBUG] Parsed message - ID: 4, Method: tools/call
+[2025-03-21T15:28:17.599Z] [DEBUG] Processing RPC message: {"id":4,"method":"tools/call","params":{"name":"bookstack_list_books","arguments":{"offset":"0","count":"10"}}}
+[2025-03-21T15:28:17.599Z] [DEBUG] Tool call request received for: bookstack_list_books
+[2025-03-21T15:28:17.600Z] [DEBUG] Tool call arguments: {"offset":"0","count":"10"}
+[2025-03-21T15:28:17.600Z] [DEBUG] Executing tool: bookstack_list_books
+[2025-03-21T15:28:17.601Z] [DEBUG] Successfully processed message 4
+[2025-03-21T15:28:17.601Z] [DEBUG] Tool execution successful: {"content":[{"type":"error","text":"[\n  {\n    \"code\": \"invalid_type\",\n    \"expected\": \"number\",\n    \"received\": \"string\",\n    \"path\": [\n      \"offset\"\n    ],\n    \"message\": \"Expected number, received string\"\n  },\n  {\n    \"code\": \"invalid_type\",\n    \"expected\": \"number\",\n    \"received\": \"string\",\n    \"path\": [\n      \"count\"\n    ],\n    \"message\": \"Expected number, received string\"\n  }\n]"}]}
+[2025-03-21T15:28:17.602Z] [DEBUG] Transport sending message: {"result":{"content":[{"type":"error","text":"[\n  {\n    \"code\": \"invalid_type\",\n    \"expected\": \"number\",\n    \"received\": \"string\",\n    \"path\": [\n      \"offset\"\n    ],\n    \"message\": \"Expected number, received string\"\n  },\n  {\n    \"code\": \"invalid_type\",\n    \"expected\": \"number\",\n    \"received\": \"string\",\n    \"path\": [\n      \"count\"\n    ],\n    \"message\": \"Expected number, received string\"\n  }\n]"}]},"jsonrpc":"2.0","id":4}
+[2025-03-21T15:28:25.819Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:28:40.830Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:28:55.845Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:29:10.847Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:29:25.852Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:29:40.865Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:29:55.871Z] [DEBUG] Sending keep-alive ping
+[2025-03-21T15:30:10.874Z] [DEBUG] Sending keep-alive ping

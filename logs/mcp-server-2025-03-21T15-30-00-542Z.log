@@ -1,0 +1,44 @@
+[2025-03-21T15:30:00.623Z] [DEBUG] Successfully read package.json from project root: E:\PROJECTS\letta tools\mcp-framework-server\package.json
+[2025-03-21T15:30:00.624Z] [INFO] Using name from package.json: mcp-framework-server
+[2025-03-21T15:30:00.624Z] [DEBUG] Successfully read package.json from project root: E:\PROJECTS\letta tools\mcp-framework-server\package.json
+[2025-03-21T15:30:00.624Z] [INFO] Using version from package.json: 0.0.1
+[2025-03-21T15:30:00.625Z] [INFO] Initializing MCP Server: mcp-framework-server@0.0.1
+[2025-03-21T15:30:00.625Z] [DEBUG] Initialized ToolLoader with directory: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools
+[2025-03-21T15:30:00.625Z] [DEBUG] Initialized PromptLoader with directory: E:\PROJECTS\letta tools\mcp-framework-server\dist\prompts
+[2025-03-21T15:30:00.625Z] [DEBUG] Initialized ResourceLoader with directory: E:\PROJECTS\letta tools\mcp-framework-server\dist\resources
+[2025-03-21T15:30:00.626Z] [DEBUG] Looking for tools in: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools
+[2025-03-21T15:30:00.626Z] [DEBUG] Looking for prompts in: E:\PROJECTS\letta tools\mcp-framework-server\dist\prompts
+[2025-03-21T15:30:00.626Z] [DEBUG] Looking for resources in: E:\PROJECTS\letta tools\mcp-framework-server\dist\resources
+[2025-03-21T15:30:00.627Z] [DEBUG] Attempting to load tools from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools
+[2025-03-21T15:30:00.628Z] [DEBUG] Found files in directory: BookstackCreateBookTool.d.ts, BookstackCreateBookTool.js, BookstackCreatePageTool.d.ts, BookstackCreatePageTool.js, BookstackListBooksTool.d.ts, BookstackListBooksTool.js, BookstackToolBase.d.ts, BookstackToolBase.js, create_book.py, create_bookshelf.py, create_chapter.py, create_page.py, delete_book.py, delete_bookshelf.py, delete_chapter.py, delete_page.py, ExampleTool.d.ts, ExampleTool.js, ExampleToolTool.d.ts, ExampleToolTool.js, list_books.py, list_bookshelves.py, list_chapters.py, list_pages.py, read_book.py, read_bookshelf.py, read_chapter.py, read_page.py, test_tools.py, update_book.py, update_bookshelf.py, update_chapter.py, update_page.py, upload_all_tools.py
+[2025-03-21T15:30:00.628Z] [DEBUG] Checking file BookstackCreateBookTool.js: included
+[2025-03-21T15:30:00.629Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\BookstackCreateBookTool.js
+[2025-03-21T15:30:00.630Z] [DEBUG] Validated tool: bookstack_create_book
+[2025-03-21T15:30:00.630Z] [DEBUG] Checking file BookstackCreatePageTool.js: included
+[2025-03-21T15:30:00.630Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\BookstackCreatePageTool.js
+[2025-03-21T15:30:00.631Z] [DEBUG] Validated tool: bookstack_create_page
+[2025-03-21T15:30:00.631Z] [DEBUG] Checking file BookstackListBooksTool.js: included
+[2025-03-21T15:30:00.631Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\BookstackListBooksTool.js
+[2025-03-21T15:30:00.632Z] [DEBUG] Validated tool: bookstack_list_books
+[2025-03-21T15:30:00.632Z] [DEBUG] Checking file BookstackToolBase.js: included
+[2025-03-21T15:30:00.632Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\BookstackToolBase.js
+[2025-03-21T15:30:00.633Z] [WARN] Invalid tool found: missing required properties
+[2025-03-21T15:30:00.633Z] [DEBUG] Checking file ExampleTool.js: included
+[2025-03-21T15:30:00.633Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\ExampleTool.js
+[2025-03-21T15:30:00.637Z] [DEBUG] Validated tool: example_tool
+[2025-03-21T15:30:00.637Z] [DEBUG] Checking file ExampleToolTool.js: included
+[2025-03-21T15:30:00.638Z] [DEBUG] Attempting to load tool from: E:\PROJECTS\letta tools\mcp-framework-server\dist\tools\ExampleToolTool.js
+[2025-03-21T15:30:00.639Z] [DEBUG] Validated tool: example_tool
+[2025-03-21T15:30:00.639Z] [DEBUG] Successfully loaded 5 tools: bookstack_create_book, bookstack_create_page, bookstack_list_books, example_tool, example_tool
+[2025-03-21T15:30:00.640Z] [DEBUG] Attempting to load prompts from: E:\PROJECTS\letta tools\mcp-framework-server\dist\prompts
+[2025-03-21T15:30:00.640Z] [DEBUG] No prompts directory found
+[2025-03-21T15:30:00.641Z] [DEBUG] Attempting to load resources from: E:\PROJECTS\letta tools\mcp-framework-server\dist\resources
+[2025-03-21T15:30:00.641Z] [DEBUG] No resources directory found
+[2025-03-21T15:30:00.641Z] [DEBUG] No prompts directory found
+[2025-03-21T15:30:00.642Z] [DEBUG] No resources directory found
+[2025-03-21T15:30:00.642Z] [DEBUG] Creating MCP Server instance
+[2025-03-21T15:30:00.642Z] [DEBUG] Server created with capabilities: {"tools":{"enabled":true}}
+[2025-03-21T15:30:00.643Z] [INFO] Starting transport...
+[2025-03-21T15:30:00.643Z] [DEBUG] Creating transport: sse
+[2025-03-21T15:30:00.643Z] [DEBUG] SSE transport configured with: {"port":8080,"endpoint":"/sse","messageEndpoint":"/messages","maxMessageSize":"4mb","headers":{"Cache-Control":"no-cache","Connection":"keep-alive"},"cors":{"allowOrigin":"*","allowMethods":"GET, POST, OPTIONS","allowHeaders":"Content-Type, Authorization, x-api-key","exposeHeaders":"Content-Type, Authorization, x-api-key","maxAge":"86400"}}
+[2025-03-21T15:30:00.646Z] [ERROR] SSE server error: Error: listen EADDRINUSE: address already in use :::8080
