@@ -10,7 +10,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc && mcp-build",
+    "build": "tsc",
     "prepare": "npm run build",
     "watch": "tsc --watch",
     "copy-scripts": "node copy-scripts.js",

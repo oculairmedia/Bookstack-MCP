@@ -1,18 +1,27 @@
 version: "3.8"
 services:
-  mcp-server:
+  bookstackmcp:
     build:
       context: .
-    container_name: mcp-framework-server
-    environment:
-      - NODE_ENV=development
-      - PORT=3004
-      - TRANSPORT=sse
-      - BS_URL=https://knowledge.oculair.ca
-      - BS_TOKEN_ID=POnHR9Lbvm73T2IOcyRSeAqpA8bSGdMT
-      - BS_TOKEN_SECRET=735wM5dScfUkcOy7qcrgqQ1eC5fBF7IE
-      - PYTHONUNBUFFERED=1
+      args:
+        TRANSPORT: http
+    image: oculair/bookstackmcp:http
     ports:
-      - "3004:3004"
-    command: node dist/index.js --transport sse
+      - 3054:3054
     restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PORT=3054
+      - TRANSPORT=http
+      - BS_URL=${BS_URL}
+      - BS_TOKEN_ID=${BS_TOKEN_ID}
+      - BS_TOKEN_SECRET=${BS_TOKEN_SECRET}
+      - NODE_ENV=${NODE_ENV:-production}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3054/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+networks: {}
