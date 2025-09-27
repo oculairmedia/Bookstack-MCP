@@ -1,62 +1,89 @@
-import { MCPTool } from "mcp-framework";
 import { z } from "zod";
-import { BookstackToolBase } from "./BookstackToolBase.js";
-interface Tag {
+import { BookstackTool } from "../bookstack/BookstackTool.js";
+declare const schema: z.ZodObject<{
+    name: z.ZodString;
+    book_id: z.ZodOptional<z.ZodNumber>;
+    chapter_id: z.ZodOptional<z.ZodNumber>;
+    markdown: z.ZodOptional<z.ZodString>;
+    html: z.ZodOptional<z.ZodString>;
+    tags: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        name: z.ZodString;
+        value: z.ZodString;
+    }, "strip", z.ZodTypeAny, {
+        value: string;
+        name: string;
+    }, {
+        value: string;
+        name: string;
+    }>, "many">>;
+    priority: z.ZodOptional<z.ZodNumber>;
+}, "strip", z.ZodTypeAny, {
     name: string;
-    value: string;
-}
-interface CreatePageInput {
+    tags?: {
+        value: string;
+        name: string;
+    }[] | undefined;
+    book_id?: number | undefined;
+    priority?: number | undefined;
+    chapter_id?: number | undefined;
+    markdown?: string | undefined;
+    html?: string | undefined;
+}, {
     name: string;
-    book_id?: string;
-    chapter_id?: string;
-    markdown?: string;
-    html?: string;
-    tags?: Tag[];
-    priority?: string;
-}
-declare class BookstackCreatePageTool extends MCPTool<CreatePageInput> {
+    tags?: {
+        value: string;
+        name: string;
+    }[] | undefined;
+    book_id?: number | undefined;
+    priority?: number | undefined;
+    chapter_id?: number | undefined;
+    markdown?: string | undefined;
+    html?: string | undefined;
+}>;
+type CreatePageInput = z.infer<typeof schema>;
+declare class BookstackCreatePageTool extends BookstackTool<CreatePageInput> {
     name: string;
     description: string;
-    toolBase: BookstackToolBase;
-    schema: {
-        name: {
-            type: z.ZodString;
-            description: string;
-        };
-        book_id: {
-            type: z.ZodOptional<z.ZodString>;
-            description: string;
-        };
-        chapter_id: {
-            type: z.ZodOptional<z.ZodString>;
-            description: string;
-        };
-        markdown: {
-            type: z.ZodOptional<z.ZodString>;
-            description: string;
-        };
-        html: {
-            type: z.ZodOptional<z.ZodString>;
-            description: string;
-        };
-        tags: {
-            type: z.ZodOptional<z.ZodArray<z.ZodObject<{
-                name: z.ZodString;
-                value: z.ZodString;
-            }, "strip", z.ZodTypeAny, {
-                value: string;
-                name: string;
-            }, {
-                value: string;
-                name: string;
-            }>, "many">>;
-            description: string;
-        };
-        priority: {
-            type: z.ZodOptional<z.ZodString>;
-            description: string;
-        };
-    };
-    execute(input: CreatePageInput): Promise<string>;
+    schema: z.ZodObject<{
+        name: z.ZodString;
+        book_id: z.ZodOptional<z.ZodNumber>;
+        chapter_id: z.ZodOptional<z.ZodNumber>;
+        markdown: z.ZodOptional<z.ZodString>;
+        html: z.ZodOptional<z.ZodString>;
+        tags: z.ZodOptional<z.ZodArray<z.ZodObject<{
+            name: z.ZodString;
+            value: z.ZodString;
+        }, "strip", z.ZodTypeAny, {
+            value: string;
+            name: string;
+        }, {
+            value: string;
+            name: string;
+        }>, "many">>;
+        priority: z.ZodOptional<z.ZodNumber>;
+    }, "strip", z.ZodTypeAny, {
+        name: string;
+        tags?: {
+            value: string;
+            name: string;
+        }[] | undefined;
+        book_id?: number | undefined;
+        priority?: number | undefined;
+        chapter_id?: number | undefined;
+        markdown?: string | undefined;
+        html?: string | undefined;
+    }, {
+        name: string;
+        tags?: {
+            value: string;
+            name: string;
+        }[] | undefined;
+        book_id?: number | undefined;
+        priority?: number | undefined;
+        chapter_id?: number | undefined;
+        markdown?: string | undefined;
+        html?: string | undefined;
+    }>;
+    execute(input: CreatePageInput): Promise<import("../bookstack/BookstackTool.js").ToolContent[]>;
 }
 export default BookstackCreatePageTool;

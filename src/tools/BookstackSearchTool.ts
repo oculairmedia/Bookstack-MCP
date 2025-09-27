@@ -1,65 +1,139 @@
-import { MCPTool } from "mcp-framework";
 import { z } from "zod";
-import { BookstackToolBase } from "./BookstackToolBase.js";
+import { BookstackTool, type JsonValue, type JsonObject } from "../bookstack/BookstackTool.js";
 
-interface BookstackSearchToolInput {
-  query: string;
-  page?: string;
-  count?: string;
-}
+const schema = z
+  .object({
+    query: z.string().min(1).describe("Search query text"),
+    page: z
+      .number()
+      .int()
+      .min(1)
+      .describe("Page number for pagination")
+      .optional(),
+    count: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .describe("Number of results per page (max 100)")
+      .optional(),
+  })
+  .describe("Bookstack search input");
 
-class BookstackSearchTool extends MCPTool<BookstackSearchToolInput> {
+type BookstackSearchInput = z.infer<typeof schema>;
+
+class BookstackSearchTool extends BookstackTool<BookstackSearchInput> {
   name = "bookstack_search";
-  description = "Searches content (shelves, books, chapters, pages) in BookStack. Uses advanced search syntax.";
-  toolBase = new BookstackToolBase();
+  description = "Searches content across Bookstack with advanced query support";
+  schema = schema;
 
-  schema = {
-    query: {
-      type: z.string(),
-      description: "The search query string. Supports advanced BookStack search syntax.",
-    },
-    page: {
-      type: z.string().optional(),
-      description: "The page number for pagination.",
-    },
-    count: {
-      type: z.string().optional(),
-      description: "The number of results per page (max 100).",
-    },
-  };
+  async execute(input: BookstackSearchInput) {
+    const queryParams: Record<string, string | number> = {
+      query: input.query,
+    };
 
-  async execute(input: BookstackSearchToolInput) {
-    try {
-      console.log(`Executing bookstack_search with input: ${JSON.stringify(input)}`);
-      
-      // Convert string inputs to numbers where needed
-      const page = input.page ? parseInt(input.page, 10) : undefined;
-      const count = input.count ? parseInt(input.count, 10) : undefined;
-      
-      // Validate converted numbers
-      if (page !== undefined && (isNaN(page) || page < 1)) {
-        return `Error: Invalid page value. Must be a positive number.`;
-      }
-      
-      if (count !== undefined && (isNaN(count) || count < 1 || count > 100)) {
-        return `Error: Invalid count value. Must be a positive number (max 100).`;
-      }
-      
-      const scriptArgs = {
+    if (input.page !== undefined) {
+      queryParams.page = input.page;
+    }
+
+    if (input.count !== undefined) {
+      queryParams.count = input.count;
+    }
+
+    const limit = input.count ?? 20;
+
+    return this.runRequest(async () => {
+      const data = await this.getRequest<{ data?: unknown; total?: unknown }>(
+        "/api/search",
+        { query: queryParams }
+      );
+
+      const items = Array.isArray(data?.data) ? (data.data as JsonValue[]) : [];
+
+      const results = items
+        .map(item => this.createSearchResult(item))
+        .filter((value): value is NonNullable<typeof value> => Boolean(value))
+        .slice(0, limit);
+
+      const payload: JsonValue = {
         query: input.query,
-        ...(page && { page: page }),
-        ...(count && { count: count }),
+        total: typeof data?.total === "number" ? data.total : results.length,
+        returned: results.length,
+        results,
       };
 
-      const result = await this.toolBase.executePythonScript("search", scriptArgs);
-      
-      // Return the result as a string
-      return result;
-    } catch (error: any) {
-      console.error("Error executing bookstack_search:", error);
-      // Return the full error message which includes Python traceback details
-      return `Error: ${error.message || error || 'Unknown error'}`;
+      return payload;
+    });
+  }
+
+  private createSearchResult(item: JsonValue): JsonValue | undefined {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return undefined;
     }
+
+    const typed = item as Record<string, JsonValue>;
+    const title = this.asString(typed.name) ?? this.asString(typed.slug) ?? "Untitled";
+    const summary = this.extractSummary(typed);
+
+    const result: JsonObject = {
+      id: typed.id ?? null,
+      type: this.asString(typed.type) ?? "unknown",
+      title,
+      url: this.asString(typed.url) ?? null,
+      summary,
+    };
+
+    if (typed.book && typeof typed.book === "object" && !Array.isArray(typed.book)) {
+      const book = typed.book as Record<string, JsonValue>;
+      result.book = {
+        id: book.id ?? null,
+        name: this.asString(book.name) ?? null,
+      } as JsonValue;
+    }
+
+    if (typed.chapter && typeof typed.chapter === "object" && !Array.isArray(typed.chapter)) {
+      const chapter = typed.chapter as Record<string, JsonValue>;
+      result.chapter = {
+        id: chapter.id ?? null,
+        name: this.asString(chapter.name) ?? null,
+      } as JsonValue;
+    }
+
+    return result;
+  }
+
+  private extractSummary(item: Record<string, JsonValue>): string {
+    const preview = item.preview_html;
+    if (preview && typeof preview === "object" && !Array.isArray(preview)) {
+      const content = this.asString((preview as Record<string, JsonValue>).content);
+      if (content) {
+        return this.trimSummary(content);
+      }
+    }
+
+    const description = this.asString(item.description);
+    if (description) {
+      return this.trimSummary(description);
+    }
+
+    return "No summary available";
+  }
+
+  private trimSummary(raw: string): string {
+    const withoutTags = raw.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+    return withoutTags.length > 280 ? `${withoutTags.slice(0, 277)}...` : withoutTags;
+  }
+
+  private asString(value: JsonValue | undefined): string | undefined {
+    if (typeof value === "string") {
+      return value;
+    }
+
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+
+    return undefined;
   }
 }
 

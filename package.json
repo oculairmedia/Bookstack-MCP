@@ -14,14 +14,20 @@
     "prepare": "npm run build",
     "watch": "tsc --watch",
     "copy-scripts": "node copy-scripts.js",
-    "start": "npm run copy-scripts && node dist/index.js"
+    "start": "npm run copy-scripts && node dist/index.js",
+    "start:http": "npm run copy-scripts && TRANSPORT=http node dist/index.js --http",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.1",
     "dotenv": "^16.4.7",
-    "mcp-framework": "^0.1.29"
+    "mcp-framework": "^0.2.15",
+    "undici": "^7.4.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.24",
-    "typescript": "^5.3.3"
+    "@vitest/coverage-v8": "^3.2.4",
+    "typescript": "^5.3.3",
+    "vitest": "^3.2.4"
   }
 }

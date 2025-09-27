@@ -1,52 +1,77 @@
-import { MCPTool } from "mcp-framework";
 import { z } from "zod";
-import { BookstackToolBase } from "./BookstackToolBase.js";
-interface Tag {
-    name: string;
-    value: string;
-}
-interface UpdateBookInput {
-    id: string;
-    name?: string;
-    description?: string;
-    tags?: Tag[];
-    image_id?: string;
-}
-declare class BookstackUpdateBookTool extends MCPTool<UpdateBookInput> {
+import { BookstackTool } from "../bookstack/BookstackTool.js";
+declare const schema: z.ZodObject<{
+    id: z.ZodNumber;
+    name: z.ZodOptional<z.ZodString>;
+    description: z.ZodOptional<z.ZodString>;
+    tags: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        name: z.ZodString;
+        value: z.ZodString;
+    }, "strip", z.ZodTypeAny, {
+        value: string;
+        name: string;
+    }, {
+        value: string;
+        name: string;
+    }>, "many">>;
+    imageId: z.ZodOptional<z.ZodNumber>;
+}, "strip", z.ZodTypeAny, {
+    id: number;
+    name?: string | undefined;
+    description?: string | undefined;
+    tags?: {
+        value: string;
+        name: string;
+    }[] | undefined;
+    imageId?: number | undefined;
+}, {
+    id: number;
+    name?: string | undefined;
+    description?: string | undefined;
+    tags?: {
+        value: string;
+        name: string;
+    }[] | undefined;
+    imageId?: number | undefined;
+}>;
+type UpdateBookInput = z.infer<typeof schema>;
+declare class BookstackUpdateBookTool extends BookstackTool<UpdateBookInput> {
     name: string;
     description: string;
-    toolBase: BookstackToolBase;
-    schema: {
-        id: {
-            type: z.ZodString;
-            description: string;
-        };
-        name: {
-            type: z.ZodOptional<z.ZodString>;
-            description: string;
-        };
-        description: {
-            type: z.ZodOptional<z.ZodString>;
-            description: string;
-        };
-        tags: {
-            type: z.ZodOptional<z.ZodArray<z.ZodObject<{
-                name: z.ZodString;
-                value: z.ZodString;
-            }, "strip", z.ZodTypeAny, {
-                value: string;
-                name: string;
-            }, {
-                value: string;
-                name: string;
-            }>, "many">>;
-            description: string;
-        };
-        image_id: {
-            type: z.ZodOptional<z.ZodString>;
-            description: string;
-        };
-    };
-    execute(input: UpdateBookInput): Promise<string>;
+    schema: z.ZodObject<{
+        id: z.ZodNumber;
+        name: z.ZodOptional<z.ZodString>;
+        description: z.ZodOptional<z.ZodString>;
+        tags: z.ZodOptional<z.ZodArray<z.ZodObject<{
+            name: z.ZodString;
+            value: z.ZodString;
+        }, "strip", z.ZodTypeAny, {
+            value: string;
+            name: string;
+        }, {
+            value: string;
+            name: string;
+        }>, "many">>;
+        imageId: z.ZodOptional<z.ZodNumber>;
+    }, "strip", z.ZodTypeAny, {
+        id: number;
+        name?: string | undefined;
+        description?: string | undefined;
+        tags?: {
+            value: string;
+            name: string;
+        }[] | undefined;
+        imageId?: number | undefined;
+    }, {
+        id: number;
+        name?: string | undefined;
+        description?: string | undefined;
+        tags?: {
+            value: string;
+            name: string;
+        }[] | undefined;
+        imageId?: number | undefined;
+    }>;
+    execute(input: UpdateBookInput): Promise<import("../bookstack/BookstackTool.js").ToolContent[]>;
 }
 export default BookstackUpdateBookTool;

@@ -1,19 +1,23 @@
-import { MCPTool } from "mcp-framework";
 import { z } from "zod";
-import { BookstackToolBase } from "./BookstackToolBase.js";
-interface ReadBookshelfInput {
-    id: string;
-}
-declare class BookstackReadBookshelfTool extends MCPTool<ReadBookshelfInput> {
+import { BookstackTool } from "../bookstack/BookstackTool.js";
+declare const schema: z.ZodObject<{
+    id: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    id: number;
+}, {
+    id: number;
+}>;
+type ReadBookshelfInput = z.infer<typeof schema>;
+declare class BookstackReadBookshelfTool extends BookstackTool<ReadBookshelfInput> {
     name: string;
     description: string;
-    toolBase: BookstackToolBase;
-    schema: {
-        id: {
-            type: z.ZodString;
-            description: string;
-        };
-    };
-    execute(input: ReadBookshelfInput): Promise<string>;
+    schema: z.ZodObject<{
+        id: z.ZodNumber;
+    }, "strip", z.ZodTypeAny, {
+        id: number;
+    }, {
+        id: number;
+    }>;
+    execute(input: ReadBookshelfInput): Promise<import("../bookstack/BookstackTool.js").ToolContent[]>;
 }
 export default BookstackReadBookshelfTool;

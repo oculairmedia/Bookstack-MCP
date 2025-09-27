@@ -1,24 +1,29 @@
-import { MCPTool } from "mcp-framework";
 import { z } from "zod";
-import { BookstackToolBase } from "./BookstackToolBase.js";
-interface ListChaptersInput {
-    offset?: string;
-    count?: string;
-}
-declare class BookstackListChaptersTool extends MCPTool<ListChaptersInput> {
+import { BookstackTool } from "../bookstack/BookstackTool.js";
+declare const schema: z.ZodObject<{
+    offset: z.ZodOptional<z.ZodNumber>;
+    count: z.ZodOptional<z.ZodNumber>;
+}, "strip", z.ZodTypeAny, {
+    offset?: number | undefined;
+    count?: number | undefined;
+}, {
+    offset?: number | undefined;
+    count?: number | undefined;
+}>;
+type ListChaptersInput = z.infer<typeof schema>;
+declare class BookstackListChaptersTool extends BookstackTool<ListChaptersInput> {
     name: string;
     description: string;
-    toolBase: BookstackToolBase;
-    schema: {
-        offset: {
-            type: z.ZodOptional<z.ZodString>;
-            description: string;
-        };
-        count: {
-            type: z.ZodOptional<z.ZodString>;
-            description: string;
-        };
-    };
-    execute(input: ListChaptersInput): Promise<string>;
+    schema: z.ZodObject<{
+        offset: z.ZodOptional<z.ZodNumber>;
+        count: z.ZodOptional<z.ZodNumber>;
+    }, "strip", z.ZodTypeAny, {
+        offset?: number | undefined;
+        count?: number | undefined;
+    }, {
+        offset?: number | undefined;
+        count?: number | undefined;
+    }>;
+    execute(input: ListChaptersInput): Promise<import("../bookstack/BookstackTool.js").ToolContent[]>;
 }
 export default BookstackListChaptersTool;

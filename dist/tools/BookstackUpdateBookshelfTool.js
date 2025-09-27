@@ -1,76 +1,51 @@
-import { MCPTool } from "mcp-framework";
 import { z } from "zod";
-import { BookstackToolBase } from "./BookstackToolBase.js";
-class BookstackUpdateBookshelfTool extends MCPTool {
+import { BookstackTool } from "../bookstack/BookstackTool.js";
+import { tagArraySchema, createIdSchema } from "../bookstack/BookstackSchemas.js";
+const schema = z
+    .object({
+    id: createIdSchema("ID of the bookshelf to update"),
+    name: z.string().min(1).describe("New bookshelf name").optional(),
+    description: z.string().min(1).describe("New bookshelf description").optional(),
+    books: z
+        .array(z
+        .number()
+        .int()
+        .positive()
+        .describe("Book ID to include"))
+        .describe("Updated list of book IDs")
+        .optional(),
+    tags: tagArraySchema.describe("Updated tags").optional(),
+})
+    .describe("Update Bookshelf input");
+class BookstackUpdateBookshelfTool extends BookstackTool {
     constructor() {
         super(...arguments);
         this.name = "bookstack_update_bookshelf";
-        this.description = "Updates a bookshelf in Bookstack";
-        this.toolBase = new BookstackToolBase();
-        this.schema = {
-            id: {
-                type: z.string(),
-                description: "The ID of the bookshelf to update",
-            },
-            name: {
-                type: z.string().optional(),
-                description: "The new name of the bookshelf",
-            },
-            description: {
-                type: z.string().optional(),
-                description: "A new description of the bookshelf",
-            },
-            books: {
-                type: z.array(z.string()).optional(),
-                description: "A new list of book IDs to include in the shelf",
-            },
-            tags: {
-                type: z.array(z.object({
-                    name: z.string(),
-                    value: z.string(),
-                })).optional(),
-                description: "A new list of tag objects (each with 'name' and 'value')",
-            },
-        };
+        this.description = "Updates an existing Bookstack bookshelf";
+        this.schema = schema;
     }
     async execute(input) {
-        try {
-            console.log(`Executing bookstack_update_bookshelf with input: ${JSON.stringify(input)}`);
-            // Convert string id to number
-            const id = parseInt(input.id, 10);
-            // Validate converted number
-            if (isNaN(id) || id <= 0) {
-                return `Error: Invalid id value. Must be a positive number.`;
-            }
-            // Convert string book IDs to numbers if provided
-            let bookIds;
-            if (input.books && input.books.length > 0) {
-                bookIds = input.books.map(id => {
-                    const numId = parseInt(id, 10);
-                    if (isNaN(numId)) {
-                        throw new Error(`Invalid book ID: ${id}. Must be a number.`);
-                    }
-                    return numId;
-                });
-            }
-            // Ensure at least one field to update is provided
-            if (!input.name && !input.description && !input.books && !input.tags) {
-                return `Error: At least one field to update must be provided.`;
-            }
-            const result = await this.toolBase.executePythonScript("update_bookshelf", {
-                id: id,
-                name: input.name,
-                description: input.description,
-                books: bookIds,
-                tags: input.tags
-            });
-            // Return the result as a string
-            return result;
+        if (input.name === undefined &&
+            input.description === undefined &&
+            input.books === undefined &&
+            input.tags === undefined) {
+            return this.errorContent("Provide at least one field to update");
         }
-        catch (error) {
-            console.error("Error executing bookstack_update_bookshelf:", error);
-            return `Error: ${error.message || 'Unknown error'}`;
+        const payload = {};
+        if (input.name) {
+            payload.name = input.name;
         }
+        if (input.description) {
+            payload.description = input.description;
+        }
+        if (input.books) {
+            payload.books = input.books;
+        }
+        const formattedTags = this.formatTags(input.tags);
+        if (formattedTags) {
+            payload.tags = formattedTags;
+        }
+        return this.runRequest(() => this.putRequest(`/api/bookshelves/${input.id}`, payload));
     }
 }
 export default BookstackUpdateBookshelfTool;

@@ -16,9 +16,6 @@ This document describes the HTTP transport implementation for the Bookstack MCP 
 ### Using npm scripts
 
 ```bash
-# Development mode
-npm run dev:http
-
 # Production mode (after building)
 npm run start:http
 ```
@@ -53,7 +50,10 @@ node dist/index.js --http
 ## Configuration
 
 Environment variables:
-- `PORT`: Server port (default: 3001)
+- `PORT`: Server port (default: 3001 when `TRANSPORT=http`)
+- `HTTP_ENDPOINT`: Override the MCP endpoint path (default: `/mcp`)
+- `HEALTH_ENDPOINT`: Override the health endpoint path (default: `/health`)
+- `HTTP_RESPONSE_MODE`: `stream` (default) or `batch`
 - `BS_URL`: Bookstack API URL
 - `BS_TOKEN_ID`: Bookstack API token ID
 - `BS_TOKEN_SECRET`: Bookstack API token secret

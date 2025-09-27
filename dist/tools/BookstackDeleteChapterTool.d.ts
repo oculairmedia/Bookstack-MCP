@@ -1,19 +1,23 @@
-import { MCPTool } from "mcp-framework";
 import { z } from "zod";
-import { BookstackToolBase } from "./BookstackToolBase.js";
-interface DeleteChapterInput {
-    id: string;
-}
-declare class BookstackDeleteChapterTool extends MCPTool<DeleteChapterInput> {
+import { BookstackTool } from "../bookstack/BookstackTool.js";
+declare const schema: z.ZodObject<{
+    id: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    id: number;
+}, {
+    id: number;
+}>;
+type DeleteChapterInput = z.infer<typeof schema>;
+declare class BookstackDeleteChapterTool extends BookstackTool<DeleteChapterInput> {
     name: string;
     description: string;
-    toolBase: BookstackToolBase;
-    schema: {
-        id: {
-            type: z.ZodString;
-            description: string;
-        };
-    };
-    execute(input: DeleteChapterInput): Promise<string>;
+    schema: z.ZodObject<{
+        id: z.ZodNumber;
+    }, "strip", z.ZodTypeAny, {
+        id: number;
+    }, {
+        id: number;
+    }>;
+    execute(input: DeleteChapterInput): Promise<import("../bookstack/BookstackTool.js").ToolContent[]>;
 }
 export default BookstackDeleteChapterTool;

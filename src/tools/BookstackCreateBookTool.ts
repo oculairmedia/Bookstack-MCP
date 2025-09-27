@@ -1,75 +1,48 @@
-import { MCPTool } from "mcp-framework";
 import { z } from "zod";
-import { BookstackToolBase } from "./BookstackToolBase.js";
+import { BookstackTool, type JsonValue } from "../bookstack/BookstackTool.js";
+import { tagArraySchema } from "../bookstack/BookstackSchemas.js";
 
-interface Tag {
-  name: string;
-  value: string;
-}
+const schema = z
+  .object({
+    name: z.string().min(1).describe("Book title"),
+    description: z.string().min(1).describe("Book description"),
+    tags: tagArraySchema.describe("Tags to assign to the book").optional(),
+    imageId: z
+      .number()
+      .int()
+      .positive()
+      .describe("Image ID to use as cover")
+      .optional(),
+  })
+  .describe("Create Book input");
 
-interface CreateBookInput {
-  name: string;
-  description: string;
-  tags?: Tag[];
-  image_id?: string;
-}
+type CreateBookInput = z.infer<typeof schema>;
 
-class BookstackCreateBookTool extends MCPTool<CreateBookInput> {
+class BookstackCreateBookTool extends BookstackTool<CreateBookInput> {
   name = "bookstack_create_book";
   description = "Creates a new book in Bookstack";
-  toolBase = new BookstackToolBase();
-
-  schema = {
-    name: {
-      type: z.string(),
-      description: "The name of the book",
-    },
-    description: {
-      type: z.string(),
-      description: "A description of the book",
-    },
-    tags: {
-      type: z.array(
-        z.object({
-          name: z.string(),
-          value: z.string(),
-        })
-      ).optional(),
-      description: "A list of tag objects (each with 'name' and 'value')",
-    },
-    image_id: {
-      type: z.string().optional(),
-      description: "The ID of an image to use as the cover",
-    },
-  };
+  schema = schema;
 
   async execute(input: CreateBookInput) {
-    try {
-      console.log(`Executing bookstack_create_book with input: ${JSON.stringify(input)}`);
-      
-      // Convert string input to number
-      const image_id = input.image_id ? parseInt(input.image_id, 10) : undefined;
-      
-      // Validate converted number
-      if (input.image_id && isNaN(image_id!)) {
-        return `Error: Invalid image_id value. Must be a number.`;
-      }
-      
-      const result = await this.toolBase.executePythonScript("create_book", {
-        name: input.name,
-        description: input.description,
-        tags: input.tags,
-        image_id: image_id
-      });
-      
-      // Return the result as a string
-      return result;
-    } catch (error: any) {
-      console.error("Error executing bookstack_create_book:", error);
-      return `Error: ${error.message || 'Unknown error'}`;
+    const payload: Record<string, unknown> = {
+      name: input.name,
+      description: input.description,
+    };
+
+    const formattedTags = this.formatTags(input.tags);
+    if (formattedTags) {
+      payload.tags = formattedTags;
     }
+
+    if (input.imageId !== undefined) {
+      payload.image_id = input.imageId;
+    }
+
+    return this.runRequest(() =>
+      this.postRequest<JsonValue>("/api/books", payload)
+    );
   }
+
 }
 
-// Export the class
 export default BookstackCreateBookTool;

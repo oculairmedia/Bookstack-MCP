@@ -1,57 +1,83 @@
-import { MCPTool } from "mcp-framework";
 import { z } from "zod";
-import { BookstackToolBase } from "./BookstackToolBase.js";
-interface Tag {
-    name: string;
-    value: string;
-}
-interface UpdateChapterInput {
-    id: string;
-    book_id?: string;
-    name?: string;
-    description?: string;
-    tags?: Tag[];
-    priority?: string;
-}
-declare class BookstackUpdateChapterTool extends MCPTool<UpdateChapterInput> {
+import { BookstackTool } from "../bookstack/BookstackTool.js";
+declare const schema: z.ZodObject<{
+    id: z.ZodNumber;
+    book_id: z.ZodOptional<z.ZodNumber>;
+    name: z.ZodOptional<z.ZodString>;
+    description: z.ZodOptional<z.ZodString>;
+    tags: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        name: z.ZodString;
+        value: z.ZodString;
+    }, "strip", z.ZodTypeAny, {
+        value: string;
+        name: string;
+    }, {
+        value: string;
+        name: string;
+    }>, "many">>;
+    priority: z.ZodOptional<z.ZodNumber>;
+}, "strip", z.ZodTypeAny, {
+    id: number;
+    name?: string | undefined;
+    description?: string | undefined;
+    tags?: {
+        value: string;
+        name: string;
+    }[] | undefined;
+    book_id?: number | undefined;
+    priority?: number | undefined;
+}, {
+    id: number;
+    name?: string | undefined;
+    description?: string | undefined;
+    tags?: {
+        value: string;
+        name: string;
+    }[] | undefined;
+    book_id?: number | undefined;
+    priority?: number | undefined;
+}>;
+type UpdateChapterInput = z.infer<typeof schema>;
+declare class BookstackUpdateChapterTool extends BookstackTool<UpdateChapterInput> {
     name: string;
     description: string;
-    toolBase: BookstackToolBase;
-    schema: {
-        id: {
-            type: z.ZodString;
-            description: string;
-        };
-        book_id: {
-            type: z.ZodOptional<z.ZodString>;
-            description: string;
-        };
-        name: {
-            type: z.ZodOptional<z.ZodString>;
-            description: string;
-        };
-        description: {
-            type: z.ZodOptional<z.ZodString>;
-            description: string;
-        };
-        tags: {
-            type: z.ZodOptional<z.ZodArray<z.ZodObject<{
-                name: z.ZodString;
-                value: z.ZodString;
-            }, "strip", z.ZodTypeAny, {
-                value: string;
-                name: string;
-            }, {
-                value: string;
-                name: string;
-            }>, "many">>;
-            description: string;
-        };
-        priority: {
-            type: z.ZodOptional<z.ZodString>;
-            description: string;
-        };
-    };
-    execute(input: UpdateChapterInput): Promise<string>;
+    schema: z.ZodObject<{
+        id: z.ZodNumber;
+        book_id: z.ZodOptional<z.ZodNumber>;
+        name: z.ZodOptional<z.ZodString>;
+        description: z.ZodOptional<z.ZodString>;
+        tags: z.ZodOptional<z.ZodArray<z.ZodObject<{
+            name: z.ZodString;
+            value: z.ZodString;
+        }, "strip", z.ZodTypeAny, {
+            value: string;
+            name: string;
+        }, {
+            value: string;
+            name: string;
+        }>, "many">>;
+        priority: z.ZodOptional<z.ZodNumber>;
+    }, "strip", z.ZodTypeAny, {
+        id: number;
+        name?: string | undefined;
+        description?: string | undefined;
+        tags?: {
+            value: string;
+            name: string;
+        }[] | undefined;
+        book_id?: number | undefined;
+        priority?: number | undefined;
+    }, {
+        id: number;
+        name?: string | undefined;
+        description?: string | undefined;
+        tags?: {
+            value: string;
+            name: string;
+        }[] | undefined;
+        book_id?: number | undefined;
+        priority?: number | undefined;
+    }>;
+    execute(input: UpdateChapterInput): Promise<import("../bookstack/BookstackTool.js").ToolContent[]>;
 }
 export default BookstackUpdateChapterTool;

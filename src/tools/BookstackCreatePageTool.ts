@@ -1,102 +1,84 @@
-import { MCPTool } from "mcp-framework";
 import { z } from "zod";
-import { BookstackToolBase } from "./BookstackToolBase.js";
+import { BookstackTool, type JsonValue } from "../bookstack/BookstackTool.js";
+import { tagArraySchema } from "../bookstack/BookstackSchemas.js";
 
-interface Tag {
-  name: string;
-  value: string;
-}
+const schema = z
+  .object({
+    name: z.string().min(1).describe("Page title"),
+    book_id: z
+      .number()
+      .int()
+      .positive()
+      .describe("Book ID to attach the page to")
+      .optional(),
+    chapter_id: z
+      .number()
+      .int()
+      .positive()
+      .describe("Chapter ID to attach the page to")
+      .optional(),
+    markdown: z.string().describe("Page content in Markdown format").optional(),
+    html: z.string().describe("Page content in HTML format").optional(),
+    tags: tagArraySchema.describe("Tags to assign to the page").optional(),
+    priority: z
+      .number()
+      .int()
+      .min(0)
+      .describe("Page priority")
+      .optional(),
+  })
+  .describe("Create Page input");
 
-interface CreatePageInput {
-  name: string;
-  book_id?: string;
-  chapter_id?: string;
-  markdown?: string;
-  html?: string;
-  tags?: Tag[];
-  priority?: string;
-}
+type CreatePageInput = z.infer<typeof schema>;
 
-class BookstackCreatePageTool extends MCPTool<CreatePageInput> {
+class BookstackCreatePageTool extends BookstackTool<CreatePageInput> {
   name = "bookstack_create_page";
   description = "Creates a new page in Bookstack";
-  toolBase = new BookstackToolBase();
-
-  schema = {
-    name: {
-      type: z.string(),
-      description: "The name of the page",
-    },
-    book_id: {
-      type: z.string().optional(),
-      description: "The ID of the book to create the page in",
-    },
-    chapter_id: {
-      type: z.string().optional(),
-      description: "The ID of the chapter to create the page in",
-    },
-    markdown: {
-      type: z.string().optional(),
-      description: "The page content in Markdown format",
-    },
-    html: {
-      type: z.string().optional(),
-      description: "The page content in HTML format",
-    },
-    tags: {
-      type: z.array(
-        z.object({
-          name: z.string(),
-          value: z.string(),
-        })
-      ).optional(),
-      description: "A list of tag objects (each with 'name' and 'value')",
-    },
-    priority: {
-      type: z.string().optional(),
-      description: "Page priority",
-    },
-  };
+  schema = schema;
 
   async execute(input: CreatePageInput) {
-    try {
-      console.log(`Executing bookstack_create_page with input: ${JSON.stringify(input)}`);
-      
-      // Convert string inputs to numbers
-      const book_id = input.book_id ? parseInt(input.book_id, 10) : undefined;
-      const chapter_id = input.chapter_id ? parseInt(input.chapter_id, 10) : undefined;
-      const priority = input.priority ? parseInt(input.priority, 10) : undefined;
-      
-      // Validate converted numbers
-      if (input.book_id && isNaN(book_id!)) {
-        return `Error: Invalid book_id value. Must be a number.`;
-      }
-      
-      if (input.chapter_id && isNaN(chapter_id!)) {
-        return `Error: Invalid chapter_id value. Must be a number.`;
-      }
-      
-      if (input.priority && isNaN(priority!)) {
-        return `Error: Invalid priority value. Must be a number.`;
-      }
-      
-      const result = await this.toolBase.executePythonScript("create_page", {
-        name: input.name,
-        book_id: book_id,
-        chapter_id: chapter_id,
-        markdown: input.markdown,
-        html: input.html,
-        tags: input.tags,
-        priority: priority
-      });
-      
-      // Return the result as a string
-      return result;
-    } catch (error: any) {
-      console.error("Error executing bookstack_create_page:", error);
-      return `Error: ${error.message || 'Unknown error'}`;
+    if (input.book_id === undefined && input.chapter_id === undefined) {
+      return this.errorContent("Either book_id or chapter_id must be provided");
     }
+
+    if (input.markdown && input.html) {
+      return this.errorContent("Provide either markdown or html content, not both");
+    }
+
+    const payload: Record<string, unknown> = {
+      name: input.name,
+    };
+
+    if (input.book_id !== undefined) {
+      payload.book_id = input.book_id;
+    }
+
+    if (input.chapter_id !== undefined) {
+      payload.chapter_id = input.chapter_id;
+    }
+
+    if (input.markdown) {
+      payload.markdown = input.markdown;
+    }
+
+    if (input.html) {
+      payload.html = input.html;
+    }
+
+    const formattedTags = this.formatTags(input.tags);
+    if (formattedTags) {
+      payload.tags = formattedTags;
+    }
+
+    if (input.priority !== undefined) {
+      payload.priority = input.priority;
+    }
+
+    return this.runRequest(() =>
+      this.postRequest<JsonValue>("/api/pages", payload)
+    );
   }
+
 }
 
 export default BookstackCreatePageTool;

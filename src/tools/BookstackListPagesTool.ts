@@ -1,56 +1,38 @@
-import { MCPTool } from "mcp-framework";
 import { z } from "zod";
-import { BookstackToolBase } from "./BookstackToolBase.js";
+import { BookstackTool, type JsonValue } from "../bookstack/BookstackTool.js";
 
-interface ListPagesInput {
-  offset?: string;
-  count?: string;
-}
+const schema = z
+  .object({
+    offset: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe("Number of records to skip"),
+    count: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe("Number of records to take"),
+  })
+  .describe("Parameters for listing pages");
 
-class BookstackListPagesTool extends MCPTool<ListPagesInput> {
+type ListPagesInput = z.infer<typeof schema>;
+
+class BookstackListPagesTool extends BookstackTool<ListPagesInput> {
   name = "bookstack_list_pages";
-  description = "Lists all pages in Bookstack with pagination support";
-  toolBase = new BookstackToolBase();
-
-  schema = {
-    offset: {
-      type: z.string().optional(),
-      description: "Number of records to skip",
-    },
-    count: {
-      type: z.string().optional(),
-      description: "Number of records to take",
-    },
-  };
+  description = "Lists pages in Bookstack with pagination support";
+  schema = schema;
 
   async execute(input: ListPagesInput) {
-    try {
-      console.log(`Executing bookstack_list_pages with input: ${JSON.stringify(input)}`);
-      
-      // Convert string inputs to numbers
-      const offset = input.offset ? parseInt(input.offset, 10) : 0;
-      const count = input.count ? parseInt(input.count, 10) : 100;
-      
-      // Validate converted numbers
-      if (isNaN(offset) || offset < 0) {
-        return `Error: Invalid offset value. Must be a non-negative number.`;
-      }
-      
-      if (isNaN(count) || count <= 0) {
-        return `Error: Invalid count value. Must be a positive number.`;
-      }
-      
-      const result = await this.toolBase.executePythonScript("list_pages", {
-        offset: offset,
-        count: count
-      });
-      
-      // Return the result as a string
-      return result;
-    } catch (error: any) {
-      console.error("Error executing bookstack_list_pages:", error);
-      return `Error: ${error.message || 'Unknown error'}`;
-    }
+    const offset = input.offset ?? 0;
+    const count = input.count ?? 100;
+
+    return this.runRequest(() =>
+      this.getRequest<JsonValue>("/api/pages", { query: { offset, count } })
+    );
   }
 }
 

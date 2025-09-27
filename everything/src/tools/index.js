@@ -18,6 +18,7 @@ import { handleUpdateBook, updateBookToolDefinition } from './update-book.js';
 import { handleUpdateBookshelf, updateBookshelfToolDefinition } from './update-bookshelf.js';
 import { handleUpdateChapter, updateChapterToolDefinition } from './update-chapter.js';
 import { handleUpdatePage, updatePageToolDefinition } from './update-page.js';
+import { handleSearchBookstack, searchBookstackToolDefinition } from './search-bookstack.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 /**
@@ -48,52 +49,59 @@ export function registerToolHandlers(server) {
             updateBookshelfToolDefinition,
             updateChapterToolDefinition,
             updatePageToolDefinition,
+            searchBookstackToolDefinition,
         ],
     }));
 
     // Register tool call handler
     server.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+        const args = (request.params.arguments && typeof request.params.arguments === 'object')
+            ? request.params.arguments
+            : {};
+
         switch (request.params.name) {
             case 'create_book':
-                return handleCreateBook(server, request.params.arguments);
+                return handleCreateBook(server, args);
             case 'create_bookshelf':
-                return handleCreateBookshelf(server, request.params.arguments);
+                return handleCreateBookshelf(server, args);
             case 'create_chapter':
-                return handleCreateChapter(server, request.params.arguments);
+                return handleCreateChapter(server, args);
             case 'create_page':
-                return handleCreatePage(server, request.params.arguments);
+                return handleCreatePage(server, args);
             case 'delete_book':
-                return handleDeleteBook(server, request.params.arguments);
+                return handleDeleteBook(server, args);
             case 'delete_bookshelf':
-                return handleDeleteBookshelf(server, request.params.arguments);
+                return handleDeleteBookshelf(server, args);
             case 'delete_chapter':
-                return handleDeleteChapter(server, request.params.arguments);
+                return handleDeleteChapter(server, args);
             case 'delete_page':
-                return handleDeletePage(server, request.params.arguments);
+                return handleDeletePage(server, args);
             case 'list_books':
-                return handleListBooks(server, request.params.arguments);
+                return handleListBooks(server, args);
             case 'list_bookshelves':
-                return handleListBookshelves(server, request.params.arguments);
+                return handleListBookshelves(server, args);
             case 'list_chapters':
-                return handleListChapters(server, request.params.arguments);
+                return handleListChapters(server, args);
             case 'list_pages':
-                return handleListPages(server, request.params.arguments);
+                return handleListPages(server, args);
             case 'read_book':
-                return handleReadBook(server, request.params.arguments);
+                return handleReadBook(server, args);
             case 'read_bookshelf':
-                return handleReadBookshelf(server, request.params.arguments);
+                return handleReadBookshelf(server, args);
             case 'read_chapter':
-                return handleReadChapter(server, request.params.arguments);
+                return handleReadChapter(server, args);
             case 'read_page':
-                return handleReadPage(server, request.params.arguments);
+                return handleReadPage(server, args);
             case 'update_book':
-                return handleUpdateBook(server, request.params.arguments);
+                return handleUpdateBook(server, args);
             case 'update_bookshelf':
-                return handleUpdateBookshelf(server, request.params.arguments);
+                return handleUpdateBookshelf(server, args);
             case 'update_chapter':
-                return handleUpdateChapter(server, request.params.arguments);
+                return handleUpdateChapter(server, args);
             case 'update_page':
-                return handleUpdatePage(server, request.params.arguments);
+                return handleUpdatePage(server, args);
+            case 'search_bookstack':
+                return handleSearchBookstack(server, args);
             default:
                 throw new McpError(
                     ErrorCode.MethodNotFound,
@@ -125,6 +133,7 @@ export const toolDefinitions = [
     updateBookshelfToolDefinition,
     updateChapterToolDefinition,
     updatePageToolDefinition,
+    searchBookstackToolDefinition,
 ];
 
 // Export all tool handlers
@@ -149,4 +158,5 @@ export const toolHandlers = {
     handleUpdateBookshelf,
     handleUpdateChapter,
     handleUpdatePage,
+    handleSearchBookstack,
 };

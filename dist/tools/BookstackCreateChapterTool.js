@@ -1,65 +1,47 @@
-import { MCPTool } from "mcp-framework";
 import { z } from "zod";
-import { BookstackToolBase } from "./BookstackToolBase.js";
-class BookstackCreateChapterTool extends MCPTool {
+import { BookstackTool } from "../bookstack/BookstackTool.js";
+import { tagArraySchema } from "../bookstack/BookstackSchemas.js";
+const schema = z
+    .object({
+    book_id: z
+        .number()
+        .int()
+        .positive()
+        .describe("ID of the book to attach the chapter to"),
+    name: z.string().min(1).describe("Chapter name"),
+    description: z.string().min(1).describe("Chapter description").optional(),
+    tags: tagArraySchema.describe("Tags for the chapter").optional(),
+    priority: z
+        .number()
+        .int()
+        .min(0)
+        .describe("Chapter priority")
+        .optional(),
+})
+    .describe("Create Chapter input");
+class BookstackCreateChapterTool extends BookstackTool {
     constructor() {
         super(...arguments);
         this.name = "bookstack_create_chapter";
         this.description = "Creates a new chapter in Bookstack";
-        this.toolBase = new BookstackToolBase();
-        this.schema = {
-            book_id: {
-                type: z.string(),
-                description: "The ID of the book to create the chapter in",
-            },
-            name: {
-                type: z.string(),
-                description: "The name of the chapter",
-            },
-            description: {
-                type: z.string().optional(),
-                description: "A description of the chapter",
-            },
-            tags: {
-                type: z.array(z.object({
-                    name: z.string(),
-                    value: z.string(),
-                })).optional(),
-                description: "A list of tag objects (each with 'name' and 'value')",
-            },
-            priority: {
-                type: z.string().optional(),
-                description: "Chapter priority",
-            },
-        };
+        this.schema = schema;
     }
     async execute(input) {
-        try {
-            console.log(`Executing bookstack_create_chapter with input: ${JSON.stringify(input)}`);
-            // Convert string inputs to numbers
-            const book_id = parseInt(input.book_id, 10);
-            const priority = input.priority ? parseInt(input.priority, 10) : undefined;
-            // Validate converted numbers
-            if (isNaN(book_id) || book_id <= 0) {
-                return `Error: Invalid book_id value. Must be a positive number.`;
-            }
-            if (input.priority && isNaN(priority)) {
-                return `Error: Invalid priority value. Must be a number.`;
-            }
-            const result = await this.toolBase.executePythonScript("create_chapter", {
-                book_id: book_id,
-                name: input.name,
-                description: input.description,
-                tags: input.tags,
-                priority: priority
-            });
-            // Return the result as a string
-            return result;
+        const payload = {
+            book_id: input.book_id,
+            name: input.name,
+        };
+        if (input.description) {
+            payload.description = input.description;
         }
-        catch (error) {
-            console.error("Error executing bookstack_create_chapter:", error);
-            return `Error: ${error.message || 'Unknown error'}`;
+        const formattedTags = this.formatTags(input.tags);
+        if (formattedTags) {
+            payload.tags = formattedTags;
         }
+        if (input.priority !== undefined) {
+            payload.priority = input.priority;
+        }
+        return this.runRequest(() => this.postRequest("/api/chapters", payload));
     }
 }
 export default BookstackCreateChapterTool;

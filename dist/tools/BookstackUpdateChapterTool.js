@@ -1,78 +1,54 @@
-import { MCPTool } from "mcp-framework";
 import { z } from "zod";
-import { BookstackToolBase } from "./BookstackToolBase.js";
-class BookstackUpdateChapterTool extends MCPTool {
+import { BookstackTool } from "../bookstack/BookstackTool.js";
+import { tagArraySchema, createIdSchema } from "../bookstack/BookstackSchemas.js";
+const schema = z
+    .object({
+    id: createIdSchema("ID of the chapter to update"),
+    book_id: createIdSchema("Book ID to move the chapter to").optional(),
+    name: z.string().min(1).describe("New chapter name").optional(),
+    description: z.string().min(1).describe("New chapter description").optional(),
+    tags: tagArraySchema.describe("Updated tags").optional(),
+    priority: z
+        .number()
+        .int()
+        .min(0)
+        .describe("Chapter priority")
+        .optional(),
+})
+    .describe("Update Chapter input");
+class BookstackUpdateChapterTool extends BookstackTool {
     constructor() {
         super(...arguments);
         this.name = "bookstack_update_chapter";
-        this.description = "Updates a chapter in Bookstack";
-        this.toolBase = new BookstackToolBase();
-        this.schema = {
-            id: {
-                type: z.string(),
-                description: "The ID of the chapter to update",
-            },
-            book_id: {
-                type: z.string().optional(),
-                description: "The ID of the book to move the chapter to",
-            },
-            name: {
-                type: z.string().optional(),
-                description: "The new name of the chapter",
-            },
-            description: {
-                type: z.string().optional(),
-                description: "A new description of the chapter",
-            },
-            tags: {
-                type: z.array(z.object({
-                    name: z.string(),
-                    value: z.string(),
-                })).optional(),
-                description: "A new list of tag objects (each with 'name' and 'value')",
-            },
-            priority: {
-                type: z.string().optional(),
-                description: "New chapter priority",
-            },
-        };
+        this.description = "Updates an existing Bookstack chapter";
+        this.schema = schema;
     }
     async execute(input) {
-        try {
-            console.log(`Executing bookstack_update_chapter with input: ${JSON.stringify(input)}`);
-            // Convert string inputs to numbers
-            const id = parseInt(input.id, 10);
-            const book_id = input.book_id ? parseInt(input.book_id, 10) : undefined;
-            const priority = input.priority ? parseInt(input.priority, 10) : undefined;
-            // Validate converted numbers
-            if (isNaN(id) || id <= 0) {
-                return `Error: Invalid id value. Must be a positive number.`;
-            }
-            if (input.book_id && (isNaN(book_id) || book_id <= 0)) {
-                return `Error: Invalid book_id value. Must be a positive number.`;
-            }
-            if (input.priority && isNaN(priority)) {
-                return `Error: Invalid priority value. Must be a number.`;
-            }
-            // Ensure at least one field to update is provided
-            if (!input.book_id && !input.name && !input.description && !input.tags && !input.priority) {
-                return `Error: At least one field to update must be provided.`;
-            }
-            const result = await this.toolBase.executePythonScript("update_chapter", {
-                id: id,
-                book_id: book_id,
-                name: input.name,
-                description: input.description,
-                tags: input.tags,
-                priority: priority
-            });
-            // Return the result as a string
-            return result;
+        if (input.book_id === undefined &&
+            input.name === undefined &&
+            input.description === undefined &&
+            input.tags === undefined &&
+            input.priority === undefined) {
+            return this.errorContent("Provide at least one field to update");
         }
-        catch (error) {
-            console.error("Error executing bookstack_update_chapter:", error);
-            return `Error: ${error.message || 'Unknown error'}`;
+        const payload = {};
+        if (input.book_id !== undefined) {
+            payload.book_id = input.book_id;
         }
+        if (input.name) {
+            payload.name = input.name;
+        }
+        if (input.description) {
+            payload.description = input.description;
+        }
+        const formattedTags = this.formatTags(input.tags);
+        if (formattedTags) {
+            payload.tags = formattedTags;
+        }
+        if (input.priority !== undefined) {
+            payload.priority = input.priority;
+        }
+        return this.runRequest(() => this.putRequest(`/api/chapters/${input.id}`, payload));
     }
 }
 export default BookstackUpdateChapterTool;
