@@ -1,5 +1,8 @@
 import { Pool, errors as undiciErrors } from "undici";
 import type { IncomingHttpHeaders } from "http";
+import { readFileSync } from "node:fs";
+import { resolve as resolvePath, delimiter as pathDelimiter } from "node:path";
+import type { ConnectionOptions } from "node:tls";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
 
@@ -58,13 +61,22 @@ export class BookstackClient {
     const origin = `${parsed.protocol}//${parsed.host}`;
     this.basePath = parsed.pathname === "/" ? "" : parsed.pathname.replace(/\/$/, "");
 
-    this.pool = new Pool(origin, {
+    const poolOptions = {
       connections: this.resolvePoolSize(),
       pipelining: 1,
       keepAliveTimeout: 30_000,
       keepAliveMaxTimeout: 60_000,
       connectTimeout: DEFAULT_TIMEOUT,
-    });
+      bodyTimeout: this.resolveBodyTimeout(),
+      headersTimeout: this.resolveHeadersTimeout(),
+    } as Pool.Options;
+
+    const tlsOptions = this.resolveTlsOptions(parsed);
+    if (tlsOptions) {
+      poolOptions.connect = tlsOptions;
+    }
+
+    this.pool = new Pool(origin, poolOptions);
 
     this.defaultHeaders = {
       Authorization: `Token ${tokenId}:${tokenSecret}`,
@@ -103,7 +115,7 @@ export class BookstackClient {
         signal,
       });
 
-      const text = await responseBody.text();
+      const text = await this.consumeBody(responseBody, method, fullPath);
       const data = this.parseBody(text) as T;
       const expected = options.expectedStatuses ?? [200];
 
@@ -203,7 +215,9 @@ export class BookstackClient {
     }
 
     if (error instanceof undiciErrors.UndiciError) {
-      return new Error(`Bookstack request failed: ${error.message}`);
+      const cause = (error as Error & { cause?: unknown }).cause;
+      const undiciMessage = [error.message, cause ? `cause=${String(cause)}` : ""].filter(Boolean).join(" ");
+      return new Error(`Bookstack request failed: ${undiciMessage}`);
     }
 
     if (error instanceof Error) {
@@ -222,7 +236,162 @@ export class BookstackClient {
     const parsed = Number.parseInt(raw, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_POOL_CONNECTIONS;
   }
+
+  private resolveBodyTimeout(): number {
+    const raw = process.env.BS_BODY_TIMEOUT_MS;
+    if (!raw) {
+      return DEFAULT_TIMEOUT;
+    }
+
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_TIMEOUT;
+  }
+
+  private resolveHeadersTimeout(): number | undefined {
+    const raw = process.env.BS_HEADERS_TIMEOUT_MS;
+    if (!raw) {
+      return undefined;
+    }
+
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+  }
+
+  private async consumeBody(
+    responseBody: unknown,
+    method: string,
+    path: string,
+  ): Promise<string> {
+    if (!responseBody || typeof (responseBody as { text?: unknown }).text !== "function") {
+      return "";
+    }
+
+    try {
+      return await (responseBody as { text: () => Promise<string> }).text();
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      console.warn(
+        `Failed to read response body for ${method.toUpperCase()} ${path}: ${reason}`,
+        error instanceof Error && error.stack ? `\n${error.stack}` : ""
+      );
+
+      try {
+        const maybeBody = responseBody as { cancel?: () => Promise<void>; resume?: () => void };
+        if (typeof maybeBody.cancel === "function") {
+          await maybeBody.cancel();
+        } else if (typeof maybeBody.resume === "function") {
+          maybeBody.resume();
+        }
+      } catch (cancelError) {
+        console.warn(
+          `Failed to discard response body for ${method.toUpperCase()} ${path}: ${cancelError instanceof Error ? cancelError.message : cancelError}`
+        );
+      }
+
+      return "";
+    }
+  }
+
+  private resolveTlsOptions(parsedUrl: URL): ConnectionOptions | undefined {
+    if (parsedUrl.protocol !== "https:") {
+      return undefined;
+    }
+
+    const options: ConnectionOptions = {};
+    let hasOption = false;
+
+    const rejectUnauthorizedEnv = process.env.BS_TLS_REJECT_UNAUTHORIZED;
+    if (rejectUnauthorizedEnv !== undefined) {
+      options.rejectUnauthorized = this.parseBoolean(rejectUnauthorizedEnv, true);
+      hasOption = true;
+    }
+
+    const ca = this.readPemEntries(process.env.BS_TLS_CA_FILE ?? process.env.BS_TLS_CA_FILES);
+    if (ca) {
+      options.ca = ca;
+      hasOption = true;
+    }
+
+    const cert = this.readPemEntries(process.env.BS_TLS_CERT_FILE);
+    if (cert) {
+      options.cert = cert;
+      hasOption = true;
+    }
+
+    const key = this.readPemEntries(process.env.BS_TLS_KEY_FILE);
+    if (key) {
+      options.key = key;
+      hasOption = true;
+    }
+
+    const passphrase = process.env.BS_TLS_PASSPHRASE;
+    if (passphrase) {
+      options.passphrase = passphrase;
+      hasOption = true;
+    }
+
+    const minVersion = process.env.BS_TLS_MIN_VERSION;
+    if (minVersion) {
+      options.minVersion = minVersion as ConnectionOptions["minVersion"];
+      hasOption = true;
+    }
+
+    const maxVersion = process.env.BS_TLS_MAX_VERSION;
+    if (maxVersion) {
+      options.maxVersion = maxVersion as ConnectionOptions["maxVersion"];
+      hasOption = true;
+    }
+
+    const servername = process.env.BS_TLS_SERVERNAME;
+    if (servername) {
+      options.servername = servername;
+      hasOption = true;
+    }
+
+    if (!hasOption) {
+      return undefined;
+    }
+
+    return options;
+  }
+
+  private parseBoolean(value: string, fallback: boolean): boolean {
+    const normalized = value.trim().toLowerCase();
+    if (["1", "true", "yes", "on"].includes(normalized)) {
+      return true;
+    }
+    if (["0", "false", "no", "off"].includes(normalized)) {
+      return false;
+    }
+    return fallback;
+  }
+
+  private readPemEntries(source?: string): string | string[] | undefined {
+    if (!source) {
+      return undefined;
+    }
+
+    const paths = source
+      .split(pathDelimiter)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    if (!paths.length) {
+      return undefined;
+    }
+
+    const contents = paths.map((entry) => {
+      const absolute = resolvePath(entry);
+      try {
+        return readFileSync(absolute, "utf8");
+      } catch (error) {
+        const cause = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to read TLS material from ${absolute}: ${cause}`);
+      }
+    });
+
+    return contents.length === 1 ? contents[0] : contents;
+  }
 }
 
 export type BookstackClientType = BookstackClient;
-

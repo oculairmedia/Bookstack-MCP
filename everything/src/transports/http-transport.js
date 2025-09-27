@@ -87,15 +87,18 @@ export async function runHTTP(server) {
         const app = express();
         const transports = {};
 
+        const allowedOrigins = [
+            'http://localhost',
+            'http://127.0.0.1',
+            'http://192.168.50.90',
+            'https://knowledge.oculair.ca'
+        ];
+        const allowedHeaders = ['Content-Type', 'MCP-Protocol-Version', 'MCP-Session-ID'];
+        const exposedHeaders = ['MCP-Session-ID'];
+
         // Security: Validate Origin header to prevent DNS rebinding attacks
         app.use((req, res, next) => {
             const origin = req.headers.origin;
-            const allowedOrigins = [
-                'http://localhost',
-                'http://127.0.0.1',
-                'http://192.168.50.90',
-                'https://knowledge.oculair.ca'
-            ];
 
             if (origin && !allowedOrigins.some(allowed => origin.startsWith(allowed))) {
                 console.warn(`Blocked request from unauthorized origin: ${origin}`);
@@ -113,9 +116,15 @@ export async function runHTTP(server) {
 
         // Middleware
         app.use(cors({
-            origin: ['http://localhost', 'http://127.0.0.1', 'http://192.168.50.90', 'https://knowledge.oculair.ca'],
-            credentials: true
+            origin: allowedOrigins,
+            credentials: true,
+            allowedHeaders,
+            exposedHeaders
         }));
+        app.use((req, res, next) => {
+            res.setHeader('Access-Control-Expose-Headers', exposedHeaders.join(', '));
+            next();
+        });
         app.use(express.json({ limit: '10mb' }));
         app.use(express.urlencoded({ extended: true }));
 
