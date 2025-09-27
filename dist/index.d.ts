@@ -19,3 +19,4 @@ import "./tools/BookstackDeleteBookTool.js";
 import "./tools/BookstackDeleteBookshelfTool.js";
 import "./tools/BookstackDeleteChapterTool.js";
 import "./tools/BookstackDeletePageTool.js";
+import "./tools/BookstackSearchTool.js";

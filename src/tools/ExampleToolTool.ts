@@ -6,7 +6,7 @@ interface ExampleToolInput {
 }
 
 class ExampleToolTool extends MCPTool<ExampleToolInput> {
-  name = "example_tool";
+  name = "example_tool_duplicate";
   description = "An example tool that processes messages";
 
   schema = {

@@ -3,7 +3,7 @@ import { z } from "zod";
 class ExampleToolTool extends MCPTool {
     constructor() {
         super(...arguments);
-        this.name = "example_tool";
+        this.name = "example_tool_duplicate";
         this.description = "An example tool that processes messages";
         this.schema = {
             message: {

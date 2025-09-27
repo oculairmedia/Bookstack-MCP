@@ -51,14 +51,17 @@ import sys
 sys.path.append("${srcToolsPath.replace(/\\/g, '/')}")
 sys.path.append("${distToolsPath.replace(/\\/g, '/')}")
 import json
-from '${scriptName}' import '${scriptName}'
+from ${scriptName} import ${scriptName}
 
 
 # Parse input arguments
 ${argStrings.join('\n')}
 
+# Create args dictionary for response
+args = {${Object.keys(args).map(key => `"${key}": ${key}`).join(', ')}}
+
 # Call the function
-result = '${scriptName}'(${Object.keys(args).join(', ')})
+result = ${scriptName}(${Object.keys(args).join(', ')})
 
 # Format response as JSON-RPC
 response = {

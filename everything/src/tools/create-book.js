@@ -106,7 +106,13 @@ export const createBookToolDefinition = {
             tags: {
                 type: 'array',
                 items: {
-                    type: 'object'
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string' },
+                        value: { type: 'string' }
+                    },
+                    required: ['name', 'value'],
+                    additionalProperties: false
                 },
                 description: 'A list of tag objects (each with "name" and "value")',
             },

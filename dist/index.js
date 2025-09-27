@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { MCPServer } from "mcp-framework";
 import { config } from "dotenv";
 // Load environment variables from .env file
@@ -30,6 +29,8 @@ import "./tools/BookstackDeleteBookTool.js";
 import "./tools/BookstackDeleteBookshelfTool.js";
 import "./tools/BookstackDeleteChapterTool.js";
 import "./tools/BookstackDeletePageTool.js";
+// Import Bookstack search tools
+import "./tools/BookstackSearchTool.js";
 // Force SSE transport if not set
 if (!process.env.TRANSPORT) {
     process.env.TRANSPORT = "sse";
