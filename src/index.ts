@@ -6,7 +6,6 @@ import type { IncomingMessage, ServerResponse } from "http";
 config();
 
 // Import tools - the framework should auto-discover these
-import "./tools/ExampleToolTool.js";
 
 // Import Bookstack list tools
 import "./tools/BookstackListBooksTool.js";
@@ -40,6 +39,8 @@ import "./tools/BookstackDeletePageTool.js";
 
 // Import Bookstack search tools
 import "./tools/BookstackSearchTool.js";
+import "./tools/BookstackManageImagesTool.js";
+import "./tools/BookstackSearchImagesTool.js";
 
 type TransportMode = "http" | "sse";
 
@@ -215,7 +216,25 @@ const transportConfig = transportMode === "http"
         port: httpPort,
         endpoint: httpEndpoint,
         responseMode: httpResponseMode,
-        healthEndpoint: httpHealthEndpoint
+        healthEndpoint: httpHealthEndpoint,
+
+        // Session configuration for proper HTTP transport
+        session: {
+          enabled: true,
+          headerName: "Mcp-Session-Id",
+          allowClientTermination: true,
+        },
+
+        // Stream resumability for missed messages
+        resumability: {
+          enabled: false,
+          historyDuration: 300000, // 5 minutes
+        },
+
+        // CORS configuration
+        cors: {
+          allowOrigin: "*"
+        }
       }
     }
   : {

@@ -6,7 +6,7 @@ const schema = z
     book_id: z
         .number()
         .int()
-        .positive()
+        .min(1)
         .describe("ID of the book to attach the chapter to"),
     name: z.string().min(1).describe("Chapter name"),
     description: z.string().min(1).describe("Chapter description").optional(),

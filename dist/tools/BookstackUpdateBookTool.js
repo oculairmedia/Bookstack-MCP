@@ -10,7 +10,7 @@ const schema = z
     imageId: z
         .number()
         .int()
-        .positive()
+        .min(1)
         .describe("Image ID to use as cover")
         .optional(),
 })

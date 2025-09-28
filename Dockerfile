@@ -1,46 +1,29 @@
-FROM node:20-slim
+FROM python:3.11-slim AS runtime
 
-# Install Python and python-requests and curl for healthcheck
-RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-requests \
-    curl \
-    && ln -sf /usr/bin/python3 /usr/bin/python \
-    && rm -rf /var/lib/apt/lists/*
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
 
-# Copy package files first for better caching
-COPY package*.json ./
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies without running scripts
-RUN npm install --ignore-scripts
+# Install Python dependencies first for better Docker layer caching
+COPY fastmcp_server/requirements.txt ./fastmcp_server/requirements.txt
+RUN pip install --no-cache-dir -r fastmcp_server/requirements.txt
 
-# Copy source code and config files
-COPY . .
+# Copy application source
+COPY fastmcp_server ./fastmcp_server
+COPY docs ./docs
 
-# Install TypeScript globally to avoid permission issues
-RUN npm install -g typescript
+# Default environment variables (override at runtime as needed)
+ENV PORT=3054 \
+    TRANSPORT=http
 
-# Build the project separately
-RUN npm run build
+EXPOSE 3054
 
-# Copy Python scripts to dist directory
-RUN mkdir -p dist/tools && cp src/tools/*.py dist/tools/
-
-EXPOSE 8080
-
-# Default environment variables (can be overridden at build or runtime)
-ARG PORT=8080
-ARG NODE_ENV=production
-ARG TRANSPORT=http
-ENV PORT=${PORT}
-ENV NODE_ENV=${NODE_ENV}
-ENV TRANSPORT=${TRANSPORT}
-
-# Add healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:${PORT}/health || exit 1
+  CMD python -c "import socket; s=socket.create_connection(('localhost', int('${PORT}')), 5); s.close()"
 
-# Run server with configurable transport
-CMD ["sh", "-c", "node ./dist/index.js --${TRANSPORT}"]
+CMD ["fastmcp", "run", "fastmcp_server/my_server.py:mcp", "--transport", "http", "--host", "0.0.0.0", "--port", "3054"]

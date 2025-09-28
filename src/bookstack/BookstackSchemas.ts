@@ -17,5 +17,5 @@ export const createIdSchema = (label: string) =>
   z
     .number()
     .int()
-    .positive()
+    .min(1)
     .describe(label);

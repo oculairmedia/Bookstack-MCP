@@ -12,6 +12,7 @@ export interface BookstackRequestOptions {
   expectedStatuses?: number[];
   signal?: AbortSignal;
   timeoutMs?: number;
+  headers?: Record<string, string | undefined>;
 }
 
 export interface BookstackResponse<T = unknown> {
@@ -41,6 +42,7 @@ export class BookstackClient {
   private readonly pool: Pool;
   private readonly basePath: string;
   private readonly defaultHeaders: Record<string, string>;
+  private readonly origin: string;
 
   private constructor() {
     const baseUrl = (process.env.BS_URL || "https://knowledge.oculair.ca").trim();
@@ -59,6 +61,7 @@ export class BookstackClient {
     }
 
     const origin = `${parsed.protocol}//${parsed.host}`;
+    this.origin = origin;
     this.basePath = parsed.pathname === "/" ? "" : parsed.pathname.replace(/\/$/, "");
 
     const poolOptions = {
@@ -96,15 +99,36 @@ export class BookstackClient {
     const queryString = this.buildQueryString(options.query);
     const fullPath = `${cleanPath}${queryString}`;
 
-    const headers: Record<string, string> = { ...this.defaultHeaders };
-    let body: string | undefined;
-    if (options.body !== undefined) {
-      headers["Content-Type"] = "application/json";
-      body = JSON.stringify(options.body);
-    }
-
+    const headers = this.createHeaders(options.headers);
+    const expected = options.expectedStatuses ?? [200];
     const timeout = options.timeoutMs ?? DEFAULT_TIMEOUT;
     const signal = options.signal ?? AbortSignal.timeout(timeout);
+
+    if (options.body !== undefined && options.body !== null) {
+      if (this.isFormData(options.body)) {
+        return this.requestWithFormData<T>({
+          method,
+          fullPath,
+          headers,
+          formData: options.body,
+          signal,
+          expected,
+        });
+      }
+    }
+
+    let body: string | undefined;
+    if (options.body !== undefined && options.body !== null) {
+      if (typeof options.body === "string") {
+        body = options.body;
+      } else {
+        body = JSON.stringify(options.body);
+      }
+
+      if (!headers["Content-Type"]) {
+        headers["Content-Type"] = "application/json";
+      }
+    }
 
     try {
       const { statusCode, headers: responseHeaders, body: responseBody } = await this.pool.request({
@@ -117,7 +141,6 @@ export class BookstackClient {
 
       const text = await this.consumeBody(responseBody, method, fullPath);
       const data = this.parseBody(text) as T;
-      const expected = options.expectedStatuses ?? [200];
 
       if (!expected.includes(statusCode)) {
         throw new BookstackApiError(`Unexpected status code ${statusCode}`, statusCode, data);
@@ -180,6 +203,20 @@ export class BookstackClient {
     return `${this.basePath}${trimmed}` || "/";
   }
 
+  private createHeaders(additional?: Record<string, string | undefined>): Record<string, string> {
+    const headers: Record<string, string> = { ...this.defaultHeaders };
+
+    if (additional) {
+      for (const [key, value] of Object.entries(additional)) {
+        if (value !== undefined) {
+          headers[key] = value;
+        }
+      }
+    }
+
+    return headers;
+  }
+
   private buildQueryString(query?: Record<string, string | number | boolean | undefined>): string {
     if (!query) {
       return "";
@@ -225,6 +262,77 @@ export class BookstackClient {
     }
 
     return new Error(`Unknown error: ${String(error)}`);
+  }
+
+  private isFormData(value: unknown): value is FormData {
+    if (typeof FormData === "undefined") {
+      return false;
+    }
+
+    return value instanceof FormData;
+  }
+
+  private async requestWithFormData<T>({
+    method,
+    fullPath,
+    headers,
+    formData,
+    signal,
+    expected,
+  }: {
+    method: HttpMethod;
+    fullPath: string;
+    headers: Record<string, string>;
+    formData: FormData;
+    signal: AbortSignal;
+    expected: number[];
+  }): Promise<BookstackResponse<T>> {
+    const url = `${this.origin}${fullPath}`;
+
+    const fetchHeaders = new Headers();
+    for (const [key, value] of Object.entries(headers)) {
+      if (key.toLowerCase() === "content-type") {
+        continue;
+      }
+
+      fetchHeaders.set(key, value);
+    }
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: fetchHeaders,
+        body: formData as unknown as BodyInit,
+        signal,
+      });
+
+      const text = await response.text();
+      const data = this.parseBody(text) as T;
+
+      if (!expected.includes(response.status)) {
+        throw new BookstackApiError(`Unexpected status code ${response.status}`, response.status, data);
+      }
+
+      const responseHeaders: IncomingHttpHeaders = {};
+      response.headers.forEach((value, key) => {
+        if (responseHeaders[key]) {
+          const existing = responseHeaders[key];
+          responseHeaders[key] = Array.isArray(existing)
+            ? [...existing, value]
+            : [existing as string, value];
+        } else {
+          responseHeaders[key] = value;
+        }
+      });
+
+      return {
+        status: response.status,
+        headers: responseHeaders,
+        data,
+      };
+    } catch (error) {
+      throw this.normalizeError(error);
+    }
   }
 
   private resolvePoolSize(): number {

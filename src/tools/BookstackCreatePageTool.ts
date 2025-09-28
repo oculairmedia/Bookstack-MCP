@@ -8,13 +8,13 @@ const schema = z
     book_id: z
       .number()
       .int()
-      .positive()
+      .min(1)
       .describe("Book ID to attach the page to")
       .optional(),
     chapter_id: z
       .number()
       .int()
-      .positive()
+      .min(1)
       .describe("Chapter ID to attach the page to")
       .optional(),
     markdown: z.string().describe("Page content in Markdown format").optional(),

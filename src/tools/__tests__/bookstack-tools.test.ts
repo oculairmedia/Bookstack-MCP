@@ -35,6 +35,8 @@ const { default: BookstackReadBookTool } = await import('../BookstackReadBookToo
 const { default: BookstackReadPageTool } = await import('../BookstackReadPageTool.js');
 const { default: BookstackDeleteBookTool } = await import('../BookstackDeleteBookTool.js');
 const { default: BookstackSearchTool } = await import('../BookstackSearchTool.js');
+const { default: BookstackManageImagesTool } = await import('../BookstackManageImagesTool.js');
+const { default: BookstackSearchImagesTool } = await import('../BookstackSearchImagesTool.js');
 
 const request = (args: Record<string, unknown>) => ({
   params: {
@@ -47,6 +49,9 @@ beforeEach(() => {
   mockClient.post.mockReset();
   mockClient.put.mockReset();
   mockClient.delete.mockReset();
+
+  const cache = (BookstackManageImagesTool as unknown as { listCache?: Map<string, unknown> }).listCache;
+  cache?.clear?.();
 });
 
 describe('Bookstack list tools', () => {
@@ -269,5 +274,109 @@ describe('Bookstack search tool', () => {
     expect(response.content[0].type).toBe('error');
     expect(response.content[0].text).toContain('Bookstack API error');
     expect(response.content[0].text).toContain('502');
+  });
+});
+
+describe('Bookstack manage images tool', () => {
+  it('creates an image from base64 payload', async () => {
+    mockClient.post.mockImplementation(async (_path: string, body: unknown) => {
+      expect(body).toBeInstanceOf(FormData);
+      const formData = body as FormData;
+      expect(formData.get('name')).toBe('Cover Art');
+      const file = formData.get('image');
+      expect(file).toBeInstanceOf(File);
+
+      return { id: 101, name: 'Cover Art' };
+    });
+
+    const tool = new BookstackManageImagesTool();
+    const response = await tool.toolCall(request({
+      operation: 'create',
+      name: 'Cover Art',
+      image: 'aGVsbG8=',
+    })) as { content: [{ type: string; text: string }] };
+
+    const payload = JSON.parse(response.content[0].text);
+    expect(payload.operation).toBe('create');
+    expect(payload.success).toBe(true);
+    expect(payload.data.id).toBe(101);
+  });
+
+  it('rejects updates without new fields', async () => {
+    const tool = new BookstackManageImagesTool();
+    const response = await tool.toolCall(request({
+      operation: 'update',
+      id: 55,
+    })) as { content: [{ type: string; text: string }] };
+
+    expect(response.content[0].type).toBe('error');
+    expect(response.content[0].text).toContain('Provide either new_name');
+    expect(mockClient.put).not.toHaveBeenCalled();
+  });
+
+  it('caches list responses to speed follow-up calls', async () => {
+    mockClient.get.mockResolvedValue({
+      data: [{ id: 1, name: 'cached-image' }],
+      total: 1,
+      count: 1,
+      offset: 0,
+    });
+
+    const tool = new BookstackManageImagesTool();
+    await tool.toolCall(request({ operation: 'list', count: 1 }));
+    expect(mockClient.get).toHaveBeenCalledTimes(1);
+
+    mockClient.get.mockClear();
+    const cachedResponse = await tool.toolCall(request({ operation: 'list', count: 1 }));
+    expect(mockClient.get).not.toHaveBeenCalled();
+
+    const body = JSON.parse((cachedResponse as { content: [{ text: string }] }).content[0].text);
+    expect(body.metadata.cached).toBe(true);
+  });
+});
+
+describe('Bookstack search images tool', () => {
+  it('builds advanced query parameters', async () => {
+    mockClient.get.mockResolvedValue({
+      data: [{ id: 9, name: 'cover.png' }],
+      total: 1,
+      count: 1,
+      offset: 0,
+    });
+
+    const tool = new BookstackSearchImagesTool();
+    const response = await tool.toolCall(request({
+      query: 'cover',
+      extension: 'png',
+      size_min: 100,
+      size_max: 2000,
+    })) as { content: [{ type: string; text: string }] };
+
+    expect(mockClient.get).toHaveBeenCalledWith('/api/image-gallery', {
+      query: expect.objectContaining({
+        query: 'cover',
+        extension: '.png',
+        size_min: 100,
+        size_max: 2000,
+        count: 20,
+        offset: 0,
+      }),
+    });
+
+    const body = JSON.parse(response.content[0].text);
+    expect(body.operation).toBe('search');
+    expect(body.metadata.total).toBe(1);
+  });
+
+  it('validates size ranges before querying', async () => {
+    const tool = new BookstackSearchImagesTool();
+    const response = await tool.toolCall(request({
+      size_min: 200,
+      size_max: 100,
+    })) as { content: [{ type: string; text: string }] };
+
+    expect(response.content[0].type).toBe('error');
+    expect(response.content[0].text).toContain('size_min');
+    expect(mockClient.get).not.toHaveBeenCalled();
   });
 });

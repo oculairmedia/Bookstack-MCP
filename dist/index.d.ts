@@ -1,4 +1,3 @@
-import "./tools/ExampleToolTool.js";
 import "./tools/BookstackListBooksTool.js";
 import "./tools/BookstackListBookshelvesTool.js";
 import "./tools/BookstackListChaptersTool.js";
@@ -20,3 +19,5 @@ import "./tools/BookstackDeleteBookshelfTool.js";
 import "./tools/BookstackDeleteChapterTool.js";
 import "./tools/BookstackDeletePageTool.js";
 import "./tools/BookstackSearchTool.js";
+import "./tools/BookstackManageImagesTool.js";
+import "./tools/BookstackSearchImagesTool.js";

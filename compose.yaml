@@ -15,7 +15,7 @@ services:
       - TRANSPORT=http
       - HTTP_ENDPOINT=/mcp
       - HEALTH_ENDPOINT=/health
-      - HTTP_RESPONSE_MODE=stream
+      - HTTP_RESPONSE_MODE=batch
       - BS_URL=${BS_URL}
       - BS_TOKEN_ID=${BS_TOKEN_ID}
       - BS_TOKEN_SECRET=${BS_TOKEN_SECRET}

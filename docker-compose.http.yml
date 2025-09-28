@@ -3,22 +3,20 @@ services:
   bookstack-mcp-http:
     build:
       context: .
-      args:
-        TRANSPORT: http
     container_name: bookstack-mcp-http
     environment:
-      - NODE_ENV=production
-      - PORT=3001
+      - PORT=3054
       - TRANSPORT=http
       - BS_URL=https://knowledge.oculair.ca
       - BS_TOKEN_ID=${BS_TOKEN_ID}
       - BS_TOKEN_SECRET=${BS_TOKEN_SECRET}
       - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
     ports:
-      - "3001:3001"
+      - "3054:3054"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      test: ["CMD", "python", "-c", "import socket; s=socket.create_connection(('localhost', 3054), 5); s.close()"]
       interval: 30s
       timeout: 10s
       retries: 3

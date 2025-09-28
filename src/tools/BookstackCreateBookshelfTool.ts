@@ -11,7 +11,7 @@ const schema = z
         z
           .number()
           .int()
-          .positive()
+          .min(1)
           .describe("Book ID to include")
       )
       .describe("Book IDs to include in the shelf")

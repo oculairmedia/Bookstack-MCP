@@ -1,9 +1,9 @@
 # Product Requirements Document (PRD)
 ## BookStack MCP Image Gallery Management Tools
 
-**Version:** 1.0  
-**Date:** 2025-01-27  
-**Status:** Draft  
+**Version:** 1.1  
+**Date:** 2025-09-27  
+**Status:** In Implementation  
 **Owner:** Development Team  
 
 ---
@@ -95,7 +95,10 @@ await bookstackManageImages({
 await bookstackManageImages({
   operation: 'list',
   count: 20,
-  offset: 0
+  offset: 0,
+  filters: [
+    { key: 'uploaded_to', value: '12' }
+  ]
 });
 
 // Update existing image
@@ -158,6 +161,19 @@ await bookstackSearchImages({
   sort: '-created_at'
 });
 ```
+
+---
+
+## 🚀 Implementation Update (September 2025)
+
+- ✅ `bookstack_manage_images` now supports full CRUD with multipart uploads and transparent base64/data-URL decoding.
+- ✅ `bookstack_search_images` delivers the consolidated discovery workflow with extension, date, and size filters.
+- ✅ Unified response envelope `{ operation, success, data, metadata }` adopted across both tools.
+- ✅ List operations use a 30s smart cache to keep repeated queries under the 2s latency goal while auto-invalidation follows create/update/delete.
+- ✅ Zod validation enforces mutually exclusive update payloads and guards size/date ranges for search.
+- ✅ Unit coverage expanded via Vitest (see `bookstack-tools.test.ts`) covering base64 upload handling, caching, and advanced query mapping.
+
+**Tracking:** BSPJ-8 (CRUD tool), BSPJ-9 (search & base64 enhancements), BSPJ-10 (caching, validation, docs) in Huly.
 
 ---
 
@@ -236,23 +252,23 @@ interface ImageManagementResponse {
 ## 📅 Implementation Timeline
 
 ### Phase 1: Core Image Management (Week 1)
-- [ ] Implement `bookstack_manage_images` tool
-- [ ] Support all 5 CRUD operations
-- [ ] Basic file upload handling (File objects)
-- [ ] Unit tests for all operations
-- [ ] Basic error handling
+- [x] Implement `bookstack_manage_images` tool
+- [x] Support all 5 CRUD operations
+- [x] Basic file upload handling (File objects)
+- [x] Unit tests for all operations
+- [x] Basic error handling
 
 ### Phase 2: Advanced Features (Week 2)
-- [ ] Implement `bookstack_search_images` tool
-- [ ] Add base64 image support
-- [ ] Enhanced error handling and validation
+- [x] Implement `bookstack_search_images` tool
+- [x] Add base64 image support
+- [x] Enhanced error handling and validation
 - [ ] Integration tests with real BookStack instance
 - [ ] Performance optimization
 
 ### Phase 3: Polish & Documentation (Week 3)
-- [ ] Response caching for list operations
-- [ ] Advanced validation and error messages
-- [ ] Comprehensive documentation with examples
+- [x] Response caching for list operations
+- [x] Advanced validation and error messages
+- [x] Comprehensive documentation with examples
 - [ ] Code review and refactoring
 - [ ] Release preparation
 

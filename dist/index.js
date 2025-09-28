@@ -3,7 +3,6 @@ import { config } from "dotenv";
 // Load environment variables from .env file
 config();
 // Import tools - the framework should auto-discover these
-import "./tools/ExampleToolTool.js";
 // Import Bookstack list tools
 import "./tools/BookstackListBooksTool.js";
 import "./tools/BookstackListBookshelvesTool.js";
@@ -31,6 +30,8 @@ import "./tools/BookstackDeleteChapterTool.js";
 import "./tools/BookstackDeletePageTool.js";
 // Import Bookstack search tools
 import "./tools/BookstackSearchTool.js";
+import "./tools/BookstackManageImagesTool.js";
+import "./tools/BookstackSearchImagesTool.js";
 const HTTP_RESPONSE_MODES = new Set(["stream", "batch"]);
 let configuredHealthEndpoint = "/health";
 let httpTransportPatched = false;
@@ -158,7 +159,22 @@ const transportConfig = transportMode === "http"
             port: httpPort,
             endpoint: httpEndpoint,
             responseMode: httpResponseMode,
-            healthEndpoint: httpHealthEndpoint
+            healthEndpoint: httpHealthEndpoint,
+            // Session configuration for proper HTTP transport
+            session: {
+                enabled: true,
+                headerName: "Mcp-Session-Id",
+                allowClientTermination: true,
+            },
+            // Stream resumability for missed messages
+            resumability: {
+                enabled: false,
+                historyDuration: 300000, // 5 minutes
+            },
+            // CORS configuration
+            cors: {
+                allowOrigin: "*"
+            }
         }
     }
     : {

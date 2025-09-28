@@ -10,7 +10,7 @@ const schema = z
         .array(z
         .number()
         .int()
-        .positive()
+        .min(1)
         .describe("Book ID to include"))
         .describe("Updated list of book IDs")
         .optional(),
