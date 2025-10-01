@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import mimetypes
 import os
 import re
 import time
@@ -10,7 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import json
 from typing import Annotated, Any, Dict, Literal, Optional, Sequence, Tuple
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
 import requests
 from fastmcp import FastMCP
@@ -101,6 +102,21 @@ _HTML_TAG_RE = re.compile(r"<[^>]+>")
 _FALLBACK_FILE_NAME = "upload.bin"
 _DEFAULT_MIME_TYPE = "application/octet-stream"
 
+# Image URL fetching configuration
+_MAX_IMAGE_SIZE_BYTES = 50 * 1024 * 1024  # 50MB limit
+_REQUEST_TIMEOUT_SECONDS = 30
+_ALLOWED_URL_SCHEMES = {"http", "https"}
+_ALLOWED_MIME_TYPES = {
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/bmp",
+    "image/tiff",
+    "image/svg+xml",
+}
+
 _CONTENT_KNOWN_FIELDS = (
     "name",
     "description",
@@ -186,6 +202,135 @@ def _normalise_str(value: Optional[str]) -> Optional[str]:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+def _is_url(value: str) -> bool:
+    """Check if a string is a valid HTTP/HTTPS URL."""
+    try:
+        parsed = urlparse(value.strip())
+        return parsed.scheme.lower() in _ALLOWED_URL_SCHEMES and bool(parsed.netloc)
+    except Exception:
+        return False
+
+
+def _extract_filename_from_url(url: str, fallback: str) -> str:
+    """Extract a sensible filename from a URL."""
+    try:
+        parsed = urlparse(url)
+        path = parsed.path.strip("/")
+        if path and "." in path:
+            filename = path.split("/")[-1]
+            # Sanitize filename - remove special characters
+            filename = re.sub(r'[^\w\-_\.]', '_', filename)
+            if filename and len(filename) <= 255:
+                return filename
+    except Exception:
+        pass
+    return fallback
+
+
+def _fetch_image_from_url(url: str, fallback_name: str) -> PreparedImage:
+    """Fetch image data from HTTP/HTTPS URL with security controls."""
+
+    if not _is_url(url):
+        raise _tool_error(
+            "Invalid URL format",
+            hint="Provide a valid HTTP or HTTPS URL.",
+            context={"url": url}
+        )
+
+    try:
+        # Security: Set reasonable timeout and size limits
+        response = requests.get(
+            url,
+            timeout=_REQUEST_TIMEOUT_SECONDS,
+            stream=True,
+            headers={
+                'User-Agent': 'BookStack-MCP/1.0',
+                'Accept': 'image/*'
+            }
+        )
+        response.raise_for_status()
+
+        # Check content length before downloading
+        content_length = response.headers.get('content-length')
+        if content_length and int(content_length) > _MAX_IMAGE_SIZE_BYTES:
+            raise _tool_error(
+                f"Image too large: {content_length} bytes exceeds {_MAX_IMAGE_SIZE_BYTES} byte limit",
+                hint="Use a smaller image or increase the size limit.",
+                context={"url": url, "size": content_length}
+            )
+
+        # Download with size limit
+        content = b""
+        for chunk in response.iter_content(chunk_size=8192):
+            content += chunk
+            if len(content) > _MAX_IMAGE_SIZE_BYTES:
+                raise _tool_error(
+                    f"Image download exceeded {_MAX_IMAGE_SIZE_BYTES} byte limit",
+                    hint="Use a smaller image or increase the size limit.",
+                    context={"url": url}
+                )
+
+        if not content:
+            raise _tool_error(
+                "Downloaded image is empty",
+                hint="Verify the URL points to a valid image file.",
+                context={"url": url}
+            )
+
+        # Determine MIME type
+        mime_type = response.headers.get('content-type', '').split(';')[0].lower()
+        if not mime_type or mime_type not in _ALLOWED_MIME_TYPES:
+            # Fallback to guessing from URL extension
+            guessed_type, _ = mimetypes.guess_type(url)
+            if guessed_type and guessed_type in _ALLOWED_MIME_TYPES:
+                mime_type = guessed_type
+            else:
+                mime_type = _DEFAULT_MIME_TYPE
+
+        # Extract filename
+        filename = _extract_filename_from_url(url, fallback_name)
+
+        return PreparedImage(
+            filename=filename,
+            content=content,
+            mime_type=mime_type
+        )
+
+    except requests.exceptions.Timeout as exc:
+        raise _tool_error(
+            f"Request timeout after {_REQUEST_TIMEOUT_SECONDS} seconds",
+            hint="The image server may be slow or unreachable. Try again later.",
+            context={"url": url}
+        ) from exc
+    except requests.exceptions.ConnectionError as exc:
+        raise _tool_error(
+            "Failed to connect to image URL",
+            hint="Check the URL and ensure the server is accessible.",
+            context={"url": url}
+        ) from exc
+    except requests.exceptions.HTTPError as exc:
+        status_code = exc.response.status_code if exc.response else "unknown"
+        raise _tool_error(
+            f"HTTP error {status_code} when fetching image",
+            hint="Verify the URL is correct and the image is publicly accessible.",
+            context={"url": url, "status_code": status_code}
+        ) from exc
+    except requests.exceptions.RequestException as exc:
+        raise _tool_error(
+            "Failed to fetch image from URL",
+            hint="Check the URL format and network connectivity.",
+            context={"url": url, "error": str(exc)}
+        ) from exc
+    except ToolError:
+        # Re-raise ToolErrors (e.g., from size limit checks) without wrapping
+        raise
+    except Exception as exc:  # pragma: no cover - defensive guard
+        raise _tool_error(
+            "Unexpected error while fetching image from URL",
+            context={"url": url, "error": str(exc)}
+        ) from exc
 
 
 def _validate_positive_int(value: Optional[Any], label: str) -> int:
@@ -445,7 +590,31 @@ def _prepare_image_payload(
     fallback_name: str,
     fallback_type: str = _DEFAULT_MIME_TYPE,
 ) -> PreparedImage:
+    """Prepare image payload from base64, data URL, or HTTP/HTTPS URL."""
+
     value = image.strip()
+
+    # Check if it looks like a URL (has scheme and netloc)
+    try:
+        parsed = urlparse(value)
+        if parsed.scheme and parsed.netloc:
+            # It looks like a URL - check if it's allowed
+            if parsed.scheme.lower() not in _ALLOWED_URL_SCHEMES:
+                raise _tool_error(
+                    f"URL scheme '{parsed.scheme}' is not supported",
+                    hint="Only HTTP and HTTPS URLs are allowed for image fetching.",
+                    context={"url": value, "scheme": parsed.scheme}
+                )
+            # It's a valid HTTP/HTTPS URL
+            return _fetch_image_from_url(value, fallback_name)
+    except ToolError:
+        # Re-raise ToolErrors
+        raise
+    except Exception:
+        # Not a valid URL, continue to other formats
+        pass
+
+    # Check if it's a data URL
     match = _DATA_URL_RE.match(value)
     if match:
         mime_type = match.group(1) or fallback_type
@@ -462,6 +631,7 @@ def _prepare_image_payload(
             )
         return PreparedImage(filename=fallback_name, content=content, mime_type=mime_type)
 
+    # Assume it's a base64 string
     content = _decode_base64_string(value)
     if not content:
         raise _tool_error(
@@ -1211,8 +1381,24 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
         ] = None,
         image: Annotated[
             Optional[str],
-            Field(default=None, description="Image payload as a base64 string or data URL for create/update operations."),
+            Field(default=None, description="Image payload as a base64 string, data URL, or HTTP/HTTPS URL for create/update operations."),
         ] = None,
+        image_type: Annotated[
+            Optional[str],
+            Field(
+                default="gallery",
+                min_length=1,
+                description="Image storage type accepted by BookStack (defaults to 'gallery').",
+            ),
+        ] = "gallery",
+        uploaded_to: Annotated[
+            Optional[int],
+            Field(
+                default=0,
+                ge=0,
+                description="Entity ID the image is attached to; defaults to 0 for gallery uploads.",
+            ),
+        ] = 0,
         id: Annotated[
             Optional[int],
             Field(default=None, ge=1, description="Image ID used by read/update/delete operations."),
@@ -1223,7 +1409,7 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
         ] = None,
         new_image: Annotated[
             Optional[str],
-            Field(default=None, description="Replacement image payload as base64 string or data URL."),
+            Field(default=None, description="Replacement image payload as a base64 string, data URL, or HTTP/HTTPS URL."),
         ] = None,
         offset: Annotated[
             Optional[int],
@@ -1255,10 +1441,15 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
         if operation == "create":
             prepared = _prepare_image_payload(image or "", name or _FALLBACK_FILE_NAME)
             files = {"image": (prepared.filename, prepared.content, prepared.mime_type)}
+            payload: Dict[str, Any] = {"name": name}
+            if image_type:
+                payload["type"] = image_type
+            if uploaded_to is not None:
+                payload["uploaded_to"] = uploaded_to
             response = _bookstack_request_form(
                 "POST",
                 "/api/image-gallery",
-                data={"name": name},
+                data=payload,
                 files=files,
             )
             _invalidate_list_cache()
