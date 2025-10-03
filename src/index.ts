@@ -1,9 +1,23 @@
+/**
+ * ⚠️ DEPRECATED: This TypeScript/mcp-framework server is deprecated and no longer maintained.
+ *
+ * Please use the Python FastMCP server instead:
+ *   cd fastmcp_server
+ *   python3 -m fastmcp_server
+ *
+ * See src/DEPRECATED.md for migration instructions.
+ */
+
 import { MCPServer, HttpStreamTransport } from "mcp-framework";
 import { config } from "dotenv";
 import type { IncomingMessage, ServerResponse } from "http";
 
 // Load environment variables from .env file
 config();
+
+console.warn("⚠️  WARNING: This TypeScript server is DEPRECATED!");
+console.warn("⚠️  Please migrate to the Python FastMCP server in fastmcp_server/");
+console.warn("⚠️  See src/DEPRECATED.md for migration instructions.\n");
 
 // Import tools - the framework should auto-discover these
 

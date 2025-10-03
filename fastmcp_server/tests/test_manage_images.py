@@ -13,6 +13,9 @@ import fastmcp_server.bookstack.tools as tools
 from fastmcp_server.bookstack.tools import ToolError, register_bookstack_tools
 
 
+DEFAULT_PAGE_ID = 1
+
+
 @pytest.fixture(autouse=True)
 def clear_image_cache() -> None:
     tools._invalidate_list_cache()
@@ -31,7 +34,7 @@ async def test_image_create_uses_form_payload(monkeypatch: MonkeyPatch) -> None:
     def fake_form(method: str, path: str, *, data=None, files=None):
         assert method == "POST"
         assert path == "/api/image-gallery"
-        assert data == {"name": "Logo", "type": "gallery", "uploaded_to": 0}
+        assert data == {"name": "Logo", "type": "gallery", "uploaded_to": DEFAULT_PAGE_ID}
         assert files is not None and "image" in files
         image_tuple = files["image"]
         assert image_tuple[0] == "Logo"
@@ -49,6 +52,7 @@ async def test_image_create_uses_form_payload(monkeypatch: MonkeyPatch) -> None:
             "operation": "create",
             "name": "Logo",
             "image": image_data,
+            "uploaded_to": DEFAULT_PAGE_ID,
         }
     )
 
@@ -203,7 +207,7 @@ async def test_image_create_from_url(monkeypatch: MonkeyPatch) -> None:
         assert data == {
             "name": "test-image",
             "type": "gallery",
-            "uploaded_to": 0,
+            "uploaded_to": DEFAULT_PAGE_ID,
         }
         assert "image" in files
         filename, content, mime_type = files["image"]
@@ -219,7 +223,8 @@ async def test_image_create_from_url(monkeypatch: MonkeyPatch) -> None:
     result = await tool.run({
         "operation": "create",
         "name": "test-image",
-        "image": "https://example.com/image.png"
+        "image": "https://example.com/image.png",
+        "uploaded_to": DEFAULT_PAGE_ID,
     })
 
     data = json.loads(result.content[0].text)
@@ -256,7 +261,7 @@ async def test_image_create_from_url_with_mime_fallback(monkeypatch: MonkeyPatch
         assert data == {
             "name": "fallback-image",
             "type": "gallery",
-            "uploaded_to": 0,
+            "uploaded_to": DEFAULT_PAGE_ID,
         }
         return payload
 
@@ -267,7 +272,8 @@ async def test_image_create_from_url_with_mime_fallback(monkeypatch: MonkeyPatch
     result = await tool.run({
         "operation": "create",
         "name": "fallback-image",
-        "image": "https://example.com/photo.jpg"
+        "image": "https://example.com/photo.jpg",
+        "uploaded_to": DEFAULT_PAGE_ID,
     })
 
     data = json.loads(result.content[0].text)
@@ -293,7 +299,8 @@ async def test_image_create_from_url_timeout(monkeypatch: MonkeyPatch) -> None:
         await tool.run({
             "operation": "create",
             "name": "timeout-test",
-            "image": "https://slow-server.example.com/image.png"
+            "image": "https://slow-server.example.com/image.png",
+            "uploaded_to": DEFAULT_PAGE_ID,
         })
 
     assert "timeout" in str(exc.value).lower()
@@ -323,7 +330,8 @@ async def test_image_create_from_url_too_large(monkeypatch: MonkeyPatch) -> None
         await tool.run({
             "operation": "create",
             "name": "large-image",
-            "image": "https://example.com/huge.png"
+            "image": "https://example.com/huge.png",
+            "uploaded_to": DEFAULT_PAGE_ID,
         })
 
     assert "too large" in str(exc.value).lower()
@@ -344,7 +352,8 @@ async def test_image_create_from_url_invalid(monkeypatch: MonkeyPatch) -> None:
         await tool.run({
             "operation": "create",
             "name": "ftp-test",
-            "image": "ftp://example.com/image.png"
+            "image": "ftp://example.com/image.png",
+            "uploaded_to": DEFAULT_PAGE_ID,
         })
 
     assert "not supported" in str(exc.value).lower() or "ftp" in str(exc.value).lower()
@@ -375,7 +384,8 @@ async def test_image_create_from_url_http_error(monkeypatch: MonkeyPatch) -> Non
         await tool.run({
             "operation": "create",
             "name": "not-found",
-            "image": "https://example.com/missing.png"
+            "image": "https://example.com/missing.png",
+            "uploaded_to": DEFAULT_PAGE_ID,
         })
 
     assert "HTTP error 404" in str(exc.value)
@@ -511,7 +521,8 @@ async def test_url_filename_extraction(monkeypatch: MonkeyPatch) -> None:
     await tool.run({
         "operation": "create",
         "name": "extracted",
-        "image": "https://example.com/assets/images/logo.png"
+        "image": "https://example.com/assets/images/logo.png",
+        "uploaded_to": DEFAULT_PAGE_ID,
     })
 
     assert captured_filenames[-1] == "logo.png"

@@ -107,3 +107,30 @@ async def test_batch_halts_when_continue_on_error_false(monkeypatch: MonkeyPatch
     assert data["failure_count"] == 1
     assert len(data["errors"]) == 1
     assert "Each delete item requires an 'id'" in data["errors"][0]["error"]
+
+
+@pytest.mark.asyncio
+async def test_batch_accepts_string_payload(monkeypatch: MonkeyPatch) -> None:
+    mcp = FastMCP("test")
+    register_bookstack_tools(mcp)
+
+    calls = []
+
+    def fake_request(method: str, path: str, *, params=None, json=None):
+        calls.append((method, path, json))
+        return {"ok": True}
+
+    monkeypatch.setattr(tools, "_bookstack_request", fake_request)
+
+    tool = await mcp.get_tool("bookstack_batch_operations")
+    await tool.run(
+        {
+            "operation": "bulk_update",
+            "entity_type": "book",
+            "items": [
+                {"id": 3, "data": json.dumps({"name": "String Name"})},
+            ],
+        }
+    )
+
+    assert calls == [("PUT", "/api/books/3", {"name": "String Name"})]

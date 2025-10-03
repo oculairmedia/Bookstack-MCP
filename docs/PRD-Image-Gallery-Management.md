@@ -167,6 +167,7 @@ await bookstackSearchImages({
 ## 🚀 Implementation Update (September 2025)
 
 - ✅ `bookstack_manage_images` now supports full CRUD with multipart uploads and transparent base64/data-URL decoding.
+- ✅ HTTP/HTTPS image sources stream through a hardened fetch path (timeouts, size limits, MIME validation) and emit BookStack's required `type`/`uploaded_to` metadata.
 - ✅ `bookstack_search_images` delivers the consolidated discovery workflow with extension, date, and size filters.
 - ✅ Unified response envelope `{ operation, success, data, metadata }` adopted across both tools.
 - ✅ List operations use a 30s smart cache to keep repeated queries under the 2s latency goal while auto-invalidation follows create/update/delete.

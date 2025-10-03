@@ -3,19 +3,21 @@
 from __future__ import annotations
 
 import base64
+import copy
+import json
 import mimetypes
 import os
 import re
 import time
 from dataclasses import dataclass
 from datetime import datetime
-import json
-from typing import Annotated, Any, Dict, Literal, Optional, Sequence, Tuple
+from typing import Annotated, Any, Dict, Literal, Optional, Sequence, Tuple, Union
 from urllib.parse import unquote, urlparse
 
 import requests
 from fastmcp import FastMCP
 from pydantic import Field
+from pydantic.json_schema import WithJsonSchema
 from typing_extensions import TypedDict
 
 try:  # FastMCP provides ToolError for structured failures
@@ -45,11 +47,233 @@ class FilterEntry(TypedDict):
     value: str
 
 
-class BatchItem(TypedDict, total=False):
-    """Batch item descriptor used by bulk operations."""
+_TAG_ITEM_SCHEMA: Dict[str, Any] = {
+    "title": "Tag",
+    "type": "object",
+    "required": ["name", "value"],
+    "properties": {
+        "name": {"type": "string", "minLength": 1, "description": "Tag key."},
+        "value": {"type": "string", "description": "Tag value."},
+    },
+    "additionalProperties": False,
+}
 
-    id: int
-    data: Dict[str, Any]
+_TAG_LIST_SCHEMA: Dict[str, Any] = {
+    "title": "Tags",
+    "description": "Tags to assign to the entity.",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "required": ["name", "value"],
+        "properties": {
+            "name": {"type": "string", "minLength": 1, "description": "Tag key."},
+            "value": {"type": "string", "description": "Tag value."},
+        },
+        "additionalProperties": False,
+    },
+}
+
+_BOOK_ASSOCIATIONS_SCHEMA: Dict[str, Any] = {
+    "title": "Books",
+    "description": "IDs of books to associate with the bookshelf.",
+    "type": "array",
+    "items": {"type": "integer", "minimum": 1},
+}
+
+_RAW_OBJECT_PAYLOAD_SCHEMA: Dict[str, Any] = {
+    "title": "Raw JSON object",
+    "description": "Custom payload forwarded directly to BookStack.",
+    "type": "object",
+    "additionalProperties": True,
+}
+
+_JSON_STRING_PAYLOAD_SCHEMA: Dict[str, Any] = {
+    "title": "JSON string payload",
+    "description": "Provide a JSON string when constructing the payload manually.",
+    "type": "string",
+}
+
+
+TagListInput = Annotated[list[TagDict], WithJsonSchema(copy.deepcopy(_TAG_LIST_SCHEMA))]
+BooksAssociationList = Annotated[list[int], WithJsonSchema(copy.deepcopy(_BOOK_ASSOCIATIONS_SCHEMA))]
+
+# Helper schemas for optional integers (MCP strict mode requires oneOf instead of type: ["integer", "null"])
+_OPTIONAL_INT_SCHEMA: Dict[str, Any] = {
+    "oneOf": [
+        {"type": "integer", "minimum": 1},
+        {"type": "null"}
+    ]
+}
+
+_OPTIONAL_STRING_SCHEMA: Dict[str, Any] = {
+    "oneOf": [
+        {"type": "string", "minLength": 1},
+        {"type": "null"}
+    ]
+}
+
+_OPTIONAL_STRING_NO_MIN_SCHEMA: Dict[str, Any] = {
+    "oneOf": [
+        {"type": "string"},
+        {"type": "null"}
+    ]
+}
+
+_BOOK_PAYLOAD_SCHEMA: Dict[str, Any] = {
+    "title": "Book payload",
+    "description": "Fields accepted when creating or updating a book.",
+    "type": "object",
+    "additionalProperties": False,
+    "unevaluatedProperties": False,
+    "properties": {
+        "name": {"type": "string", "minLength": 1, "description": "Book title."},
+        "description": {"type": "string", "minLength": 1, "description": "Book description."},
+        "tags": {
+            "type": "array",
+            "description": "Tags to assign to the entity.",
+            "items": {
+                "type": "object",
+                "required": ["name", "value"],
+                "properties": {
+                    "name": {"type": "string", "minLength": 1, "description": "Tag key."},
+                    "value": {"type": "string", "description": "Tag value."},
+                },
+                "additionalProperties": False,
+            },
+        },
+        "image_id": {"type": "integer", "minimum": 1, "description": "Existing gallery image ID to reuse as the cover."},
+        "cover_image": {"type": "string", "description": "Cover image payload (base64, data URL, or HTTP/HTTPS URL)."},
+    },
+}
+
+_BOOKSHELF_PAYLOAD_SCHEMA: Dict[str, Any] = {
+    "title": "Bookshelf payload",
+    "description": "Fields accepted when creating or updating a bookshelf.",
+    "type": "object",
+    "additionalProperties": False,
+    "unevaluatedProperties": False,
+    "properties": {
+        "name": {"type": "string", "minLength": 1, "description": "Bookshelf title."},
+        "description": {"type": "string", "description": "Bookshelf description."},
+        "books": {
+            "type": "array",
+            "description": "IDs of books to associate with the bookshelf.",
+            "items": {"type": "integer", "minimum": 1},
+        },
+        "tags": {
+            "type": "array",
+            "description": "Tags to assign to the entity.",
+            "items": {
+                "type": "object",
+                "required": ["name", "value"],
+                "properties": {
+                    "name": {"type": "string", "minLength": 1, "description": "Tag key."},
+                    "value": {"type": "string", "description": "Tag value."},
+                },
+                "additionalProperties": False,
+            },
+        },
+    },
+}
+
+_CHAPTER_PAYLOAD_SCHEMA: Dict[str, Any] = {
+    "title": "Chapter payload",
+    "description": "Fields accepted when creating or updating a chapter.",
+    "type": "object",
+    "additionalProperties": False,
+    "unevaluatedProperties": False,
+    "properties": {
+        "name": {"type": "string", "minLength": 1, "description": "Chapter title."},
+        "description": {"type": "string", "description": "Chapter description."},
+        "book_id": {"type": "integer", "minimum": 1, "description": "Parent book identifier."},
+        "priority": {"type": "integer", "minimum": 0, "description": "Ordering priority."},
+        "tags": {
+            "type": "array",
+            "description": "Tags to assign to the entity.",
+            "items": {
+                "type": "object",
+                "required": ["name", "value"],
+                "properties": {
+                    "name": {"type": "string", "minLength": 1, "description": "Tag key."},
+                    "value": {"type": "string", "description": "Tag value."},
+                },
+                "additionalProperties": False,
+            },
+        },
+    },
+}
+
+_PAGE_PAYLOAD_SCHEMA: Dict[str, Any] = {
+    "title": "Page payload",
+    "description": "Fields accepted when creating or updating a page.",
+    "type": "object",
+    "additionalProperties": False,
+    "unevaluatedProperties": False,
+    "properties": {
+        "name": {"type": "string", "minLength": 1, "description": "Page title."},
+        "book_id": {"type": "integer", "minimum": 1, "description": "Book that will contain the page."},
+        "chapter_id": {"type": "integer", "minimum": 1, "description": "Chapter that will contain the page."},
+        "markdown": {"type": "string", "description": "Markdown content."},
+        "content": {"type": "string", "description": "Alias for markdown content."},
+        "html": {"type": "string", "description": "HTML content."},
+        "priority": {"type": "integer", "minimum": 0, "description": "Ordering priority."},
+        "tags": {
+            "type": "array",
+            "description": "Tags to assign to the entity.",
+            "items": {
+                "type": "object",
+                "required": ["name", "value"],
+                "properties": {
+                    "name": {"type": "string", "minLength": 1, "description": "Tag key."},
+                    "value": {"type": "string", "description": "Tag value."},
+                },
+                "additionalProperties": False,
+            },
+        },
+    },
+}
+
+_PAYLOAD_ONE_OF_WITH_STRING_AND_NULL: list[Dict[str, Any]] = [
+    copy.deepcopy(_BOOK_PAYLOAD_SCHEMA),
+    copy.deepcopy(_BOOKSHELF_PAYLOAD_SCHEMA),
+    copy.deepcopy(_CHAPTER_PAYLOAD_SCHEMA),
+    copy.deepcopy(_PAGE_PAYLOAD_SCHEMA),
+    # Removed _RAW_OBJECT_PAYLOAD_SCHEMA to comply with MCP strict schema validation
+    # Users can still pass custom fields via JSON string in _JSON_STRING_PAYLOAD_SCHEMA
+    copy.deepcopy(_JSON_STRING_PAYLOAD_SCHEMA),
+    {"type": "null"},
+]
+
+PayloadOverrides = Annotated[Any, WithJsonSchema({
+    "oneOf": copy.deepcopy(_PAYLOAD_ONE_OF_WITH_STRING_AND_NULL),
+})]
+
+BATCH_ITEM_SCHEMA: Dict[str, Any] = {
+    "title": "Batch item",
+    "description": "Descriptor for a bulk content operation.",
+    "type": "object",
+    "additionalProperties": False,
+    "unevaluatedProperties": False,
+    "properties": {
+        "id": {"type": "integer", "minimum": 1, "description": "Entity ID used for update/delete operations."},
+        "data": {
+            "title": "Item payload",
+            "description": "Fields applied to the entity. Provide structured values or a JSON string.",
+            "oneOf": copy.deepcopy(_PAYLOAD_ONE_OF_WITH_STRING_AND_NULL),
+        },
+    },
+}
+
+BATCH_ITEMS_LIST_SCHEMA: Dict[str, Any] = {
+    "title": "Batch items",
+    "description": "List of items to process.",
+    "type": "array",
+    "minItems": 1,
+    "items": copy.deepcopy(BATCH_ITEM_SCHEMA),
+}
+
+BatchItemInput = Annotated[Dict[str, Any], WithJsonSchema(copy.deepcopy(BATCH_ITEM_SCHEMA))]
+BatchItemsListInput = Annotated[list[Dict[str, Any]], WithJsonSchema(copy.deepcopy(BATCH_ITEMS_LIST_SCHEMA))]
 
 
 @dataclass
@@ -128,6 +352,7 @@ _CONTENT_KNOWN_FIELDS = (
     "books",
     "tags",
     "image_id",
+    "cover_image",
     "priority",
 )
 
@@ -194,6 +419,42 @@ def _ensure(
 
     if not condition:
         raise _tool_error(message, hint=hint, context=context)
+
+
+def _coerce_json_object(
+    value: Optional[Union[Dict[str, Any], str]],
+    *,
+    label: str,
+) -> Dict[str, Any]:
+    """Return a dictionary parsed from a mapping or JSON string."""
+
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return dict(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return {}
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise _tool_error(
+                f"{label} must contain valid JSON",
+                hint="Provide an object such as {\"name\": \"Docs\"} or use the structured fields.",
+                context={"received": text[:200]},
+            ) from exc
+        if not isinstance(parsed, dict):
+            raise _tool_error(
+                f"{label} must be a JSON object",
+                hint="Wrap the payload in curly braces when supplying a string.",
+                context={"received": parsed},
+            )
+        return dict(parsed)
+    raise _tool_error(
+        f"{label} must be an object or JSON string",
+        context={"received_type": type(value).__name__},
+    )
 
 
 def _normalise_str(value: Optional[str]) -> Optional[str]:
@@ -474,16 +735,48 @@ def _bookstack_request(
         )
         response.raise_for_status()
     except requests.HTTPError as exc:
+        import logging
+        logger = logging.getLogger(__name__)
+
         status = exc.response.status_code if exc.response is not None else "unknown"
         preview: Optional[str] = None
+        error_detail = ""
         if exc.response is not None:
             try:
                 preview = exc.response.text[:400]
+                logger.error(f"BookStack API error {status}: {preview}")
+                # Try to extract error message from JSON response
+                try:
+                    error_json = exc.response.json()
+                    if isinstance(error_json, dict):
+                        if 'error' in error_json:
+                            error_detail = f": {error_json['error']}"
+                        elif 'message' in error_json:
+                            error_detail = f": {error_json['message']}"
+                except Exception:
+                    pass
             except Exception:  # pragma: no cover - defensive guard
                 preview = None
+
+        # Provide specific hints for common HTTP errors
+        hint = "Verify the BookStack credentials, entity identifiers, and payload fields."
+        if status == 409:
+            hint = "Conflict error (409): This usually means a resource with the same name already exists, or there's a constraint violation. Check the response_preview for details."
+        elif status == 404:
+            hint = "Not found (404): The entity ID or endpoint doesn't exist. Verify the ID is correct."
+        elif status == 401:
+            hint = "Unauthorized (401): Check your BS_TOKEN_ID and BS_TOKEN_SECRET environment variables."
+        elif status == 403:
+            hint = "Forbidden (403): Your API token doesn't have permission for this operation."
+        elif status == 422:
+            hint = "Validation error (422): The request payload is invalid. Check the response_preview for field-specific errors."
+
+        error_msg = f"BookStack API request failed with HTTP {status}{error_detail}"
+        logger.error(f"{error_msg}\nHint: {hint}\nMethod: {method}, Path: {path}")
+
         raise _tool_error(
-            f"BookStack API request failed with HTTP {status}",
-            hint="Verify the BookStack credentials, entity identifiers, and payload fields.",
+            error_msg,
+            hint=hint,
             context={
                 "method": method,
                 "path": path,
@@ -543,14 +836,39 @@ def _bookstack_request_form(
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else "unknown"
         preview: Optional[str] = None
+        error_detail = ""
         if exc.response is not None:
             try:
                 preview = exc.response.text[:400]
+                # Try to extract error message from JSON response
+                try:
+                    error_json = exc.response.json()
+                    if isinstance(error_json, dict):
+                        if 'error' in error_json:
+                            error_detail = f": {error_json['error']}"
+                        elif 'message' in error_json:
+                            error_detail = f": {error_json['message']}"
+                except Exception:
+                    pass
             except Exception:  # pragma: no cover - defensive guard
                 preview = None
+
+        # Provide specific hints for common HTTP errors
+        hint = "Confirm the image identifiers and ensure the API token grants image permissions."
+        if status == 409:
+            hint = "Conflict error (409): This usually means an image with the same name already exists. Check the response_preview for details."
+        elif status == 404:
+            hint = "Not found (404): The image ID doesn't exist. Verify the ID is correct."
+        elif status == 401:
+            hint = "Unauthorized (401): Check your BS_TOKEN_ID and BS_TOKEN_SECRET environment variables."
+        elif status == 403:
+            hint = "Forbidden (403): Your API token doesn't have permission for image operations."
+        elif status == 422:
+            hint = "Validation error (422): The image data is invalid. Check the response_preview for details."
+
         raise _tool_error(
-            f"BookStack image endpoint returned HTTP {status}",
-            hint="Confirm the image identifiers and ensure the API token grants image permissions.",
+            f"BookStack image endpoint returned HTTP {status}{error_detail}",
+            hint=hint,
             context={
                 "method": method,
                 "path": path,
@@ -639,6 +957,61 @@ def _prepare_image_payload(
             hint="Confirm the base64 string contains valid image data.",
         )
     return PreparedImage(filename=fallback_name, content=content, mime_type=fallback_type)
+
+
+
+def _prepare_cover_image_from_gallery(
+    image_id: Any,
+    *,
+    fallback_name: Optional[str],
+) -> PreparedImage:
+    """Fetch an existing gallery image and return it as a PreparedImage."""
+
+    validated_id = _validate_positive_int(image_id, "'image_id'")
+    metadata = _bookstack_request("GET", f"/api/image-gallery/{validated_id}")
+    if not isinstance(metadata, dict):
+        raise _tool_error(
+            "Unexpected response when fetching gallery image metadata",
+            hint="Ensure the image exists and the API token grants image permissions.",
+            context={"image_id": validated_id, "payload_type": type(metadata).__name__},
+        )
+
+    raw_name = metadata.get("name")
+    image_name = _normalise_str(raw_name) if isinstance(raw_name, str) else None
+
+    image_url: Optional[str] = None
+    raw_url = metadata.get("url")
+    if isinstance(raw_url, str) and raw_url.strip():
+        image_url = raw_url.strip()
+    else:
+        raw_path = metadata.get("path")
+        if isinstance(raw_path, str) and raw_path.strip():
+            image_url = f"{_bookstack_base_url()}{raw_path}"
+
+    if not image_url:
+        raise _tool_error(
+            "Gallery image metadata did not include a usable URL",
+            hint="Verify the image exists and is accessible via the BookStack instance.",
+            context={"image_id": validated_id, "metadata_keys": list(metadata.keys())},
+        )
+
+    effective_name = image_name or fallback_name or f"book-cover-{validated_id}"
+    return _fetch_image_from_url(image_url, effective_name)
+
+
+
+
+def _prepare_form_data(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert a JSON-style payload into form fields for multipart requests."""
+    form_data: Dict[str, Any] = {}
+    for key, value in payload.items():
+        if value is None or key in {"image_id", "cover_image"}:
+            continue
+        if isinstance(value, (dict, list)):
+            form_data[key] = json.dumps(value)
+        else:
+            form_data[key] = value if isinstance(value, str) else str(value)
+    return form_data
 
 
 def _decode_base64_string(payload: str) -> bytes:
@@ -742,6 +1115,7 @@ def _build_content_operation(
     content: Optional[str],
     markdown: Optional[str],
     html: Optional[str],
+    cover_image: Optional[str],
     updates: Optional[Dict[str, Any]],
     book_id: Optional[Any],
     chapter_id: Optional[Any],
@@ -760,7 +1134,7 @@ def _build_content_operation(
         _ensure(entity_id is not None, "'id' is required when deleting an entity")
         return PreparedOperation(method="DELETE", path=f"{base_path}/{entity_id}")
 
-    payload: Dict[str, Any] = dict(updates or {})
+    payload: Dict[str, Any] = _coerce_json_object(updates, label="'updates'")
     formatted_tags = _format_tags(tags)
     if formatted_tags is not None:
         payload["tags"] = formatted_tags
@@ -950,12 +1324,14 @@ def _build_content_operation(
             )
 
         payload = _compact_payload(payload)
-        _ensure(
-            bool(payload),
-            "Provide at least one field to update",
-            hint="Include at least one non-empty field (e.g., 'name', 'description', or entries in 'updates').",
-            context={"operation": operation, "entity_type": entity_type, "entity_id": entity_id},
-        )
+        allow_empty = entity_type == "book" and cover_image is not None
+        if not payload and not allow_empty:
+            _ensure(
+                bool(payload),
+                "Provide at least one field to update",
+                hint="Include at least one non-empty field (e.g., 'name', 'description', or entries in 'updates').",
+                context={"operation": operation, "entity_type": entity_type, "entity_id": entity_id},
+            )
         return PreparedOperation(method="PUT", path=f"{base_path}/{entity_id}", json=payload)
 
     raise _tool_error(
@@ -1025,7 +1401,6 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         annotations={
             "title": "Manage BookStack Content",
-            "destructiveHint": True,
         }
     )
     def bookstack_manage_content(
@@ -1039,58 +1414,72 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
         ],
         id: Annotated[
             Optional[int],
-            Field(default=None, ge=1, description="Entity ID (required for read, update, delete)."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_INT_SCHEMA), "description": "Entity ID (required for read, update, delete)."}),
         ] = None,
         name: Annotated[
             Optional[str],
-            Field(default=None, min_length=1, description="Entity name/title."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_STRING_SCHEMA), "description": "Entity name/title."}),
         ] = None,
         description: Annotated[
             Optional[str],
-            Field(default=None, min_length=1, description="Entity description."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_STRING_SCHEMA), "description": "Entity description."}),
         ] = None,
         content: Annotated[
             Optional[str],
-            Field(default=None, description="Page content (alias for markdown)."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_STRING_NO_MIN_SCHEMA), "description": "Page content (alias for markdown)."}),
         ] = None,
         markdown: Annotated[
             Optional[str],
-            Field(default=None, description="Markdown content."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_STRING_NO_MIN_SCHEMA), "description": "Markdown content."}),
         ] = None,
         html: Annotated[
             Optional[str],
-            Field(default=None, description="HTML content."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_STRING_NO_MIN_SCHEMA), "description": "HTML content."}),
+        ] = None,
+        cover_image: Annotated[
+            Optional[str],
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_STRING_NO_MIN_SCHEMA), "description": "Cover image payload (base64, data URL, or HTTP/HTTPS URL)."}),
         ] = None,
         updates: Annotated[
-            Optional[Dict[str, Any]],
+            PayloadOverrides,
             Field(default=None, description="Raw field overrides passed directly to the API."),
         ] = None,
         book_id: Annotated[
             Optional[int],
-            Field(default=None, ge=1, description="Book ID context (required for chapter create, optional otherwise)."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_INT_SCHEMA), "description": "Book ID context (required for chapter create, optional otherwise)."}),
         ] = None,
         chapter_id: Annotated[
             Optional[int],
-            Field(default=None, ge=1, description="Chapter ID context (required for page create when no book_id)."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_INT_SCHEMA), "description": "Chapter ID context (required for page create when no book_id)."}),
         ] = None,
         books: Annotated[
-            Optional[Sequence[int]],
-            Field(default=None, description="Book IDs to associate with a bookshelf."),
+            Optional[BooksAssociationList],
+            Field(
+                default=None,
+                description="Book IDs to associate with a bookshelf.",
+            ),
         ] = None,
         tags: Annotated[
-            Optional[Sequence[TagDict]],
-            Field(default=None, description="Tags to assign to the entity."),
+            Optional[TagListInput],
+            Field(
+                default=None,
+                description="Tags to assign to the entity.",
+            ),
         ] = None,
         image_id: Annotated[
             Optional[int],
-            Field(default=None, ge=1, description="Image ID to use as cover (books only)."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_INT_SCHEMA), "description": "Image ID to use as cover (books only)."}),
         ] = None,
         priority: Annotated[
             Optional[int],
-            Field(default=None, ge=0, description="Ordering priority for chapters/pages."),
+            WithJsonSchema({"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}], "description": "Ordering priority for chapters/pages."}),
         ] = None,
     ) -> Dict[str, Any]:
         """Perform CRUD operations against BookStack content entities."""
+
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"bookstack_manage_content called: operation={operation}, entity_type={entity_type}, id={id}")
 
         prepared = _build_content_operation(
             operation,
@@ -1101,6 +1490,7 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
             content=content,
             markdown=markdown,
             html=html,
+            cover_image=cover_image,
             updates=updates,
             book_id=book_id,
             chapter_id=chapter_id,
@@ -1109,6 +1499,45 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
             image_id=image_id,
             priority=priority,
         )
+
+        prepared_image_payload: Optional[PreparedImage] = None
+        if entity_type == "book" and operation in {"create", "update"}:
+            fallback_name = name or ((prepared.json or {}).get("name") if isinstance(prepared.json, dict) else None)
+            if not fallback_name:
+                fallback_name = f"book-{id}-cover" if id is not None else "book-cover"
+            if cover_image is not None:
+                prepared_image_payload = _prepare_image_payload(cover_image, fallback_name)
+            elif image_id is not None:
+                prepared_image_payload = _prepare_cover_image_from_gallery(image_id, fallback_name=fallback_name)
+
+        if prepared_image_payload is not None:
+            form_data = _prepare_form_data(prepared.json or {})
+            method = prepared.method
+            if operation == "update":
+                method = "POST"
+                form_data["_method"] = "PUT"
+            files = {"image": (
+                prepared_image_payload.filename,
+                prepared_image_payload.content,
+                prepared_image_payload.mime_type,
+            )}
+            response = _bookstack_request_form(
+                method,
+                prepared.path,
+                data=form_data or None,
+                files=files,
+            )
+            result: Dict[str, Any] = {
+                "operation": operation,
+                "entity_type": entity_type,
+                "success": True,
+                "data": response,
+            }
+            if id is not None:
+                result["id"] = id
+            elif isinstance(response, dict) and isinstance(response.get("id"), int):
+                result["id"] = response["id"]
+            return result
 
         response = _bookstack_request(
             prepared.method,
@@ -1150,7 +1579,7 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
         ] = 50,
         sort: Annotated[
             Optional[str],
-            Field(default=None, description="Sort expression understood by BookStack (e.g. '-created_at')."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_STRING_NO_MIN_SCHEMA), "description": "Sort expression understood by BookStack (e.g. '-created_at')."}),
         ] = None,
         filters: Annotated[
             Optional[Dict[str, str]],
@@ -1158,11 +1587,19 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
         ] = None,
         book_id: Annotated[
             Optional[int],
-            Field(default=None, ge=1, description="Limit chapters/pages to a specific book."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_INT_SCHEMA), "description": "Limit chapters/pages to a specific book."}),
         ] = None,
         chapter_id: Annotated[
             Optional[int],
-            Field(default=None, ge=1, description="Limit pages to a specific chapter."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_INT_SCHEMA), "description": "Limit pages to a specific chapter."}),
+        ] = None,
+        id: Annotated[
+            Optional[str],
+            Field(default=None, description="Ignored parameter (for MCP client compatibility)"),
+        ] = None,
+        request_heartbeat: Annotated[
+            Optional[bool],
+            Field(default=None, description="Ignored parameter (for MCP client compatibility)"),
         ] = None,
     ) -> Dict[str, Any]:
         """Return a paginated listing of BookStack entities."""
@@ -1302,11 +1739,15 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
         ],
         page: Annotated[
             Optional[int],
-            Field(default=None, ge=1, description="Page number for pagination."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_INT_SCHEMA), "description": "Page number for pagination."}),
         ] = None,
         count: Annotated[
             Optional[int],
-            Field(default=None, ge=1, le=100, description="Number of results per page (max 100)."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_INT_SCHEMA), "description": "Number of results per page (max 100)."}),
+        ] = None,
+        request_heartbeat: Annotated[
+            Optional[bool],
+            Field(default=None, description="Ignored parameter (for MCP client compatibility)"),
         ] = None,
     ) -> Dict[str, Any]:
         """Search across BookStack content."""
@@ -1367,7 +1808,6 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         annotations={
             "title": "Manage Image Gallery",
-            "destructiveHint": True,
         }
     )
     def bookstack_manage_images(
@@ -1381,71 +1821,85 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
         ] = None,
         image: Annotated[
             Optional[str],
-            Field(default=None, description="Image payload as a base64 string, data URL, or HTTP/HTTPS URL for create/update operations."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_STRING_NO_MIN_SCHEMA), "description": "Image payload as a base64 string, data URL, or HTTP/HTTPS URL for create/update operations."}),
         ] = None,
         image_type: Annotated[
             Optional[str],
-            Field(
-                default="gallery",
-                min_length=1,
-                description="Image storage type accepted by BookStack (defaults to 'gallery').",
-            ),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_STRING_SCHEMA), "description": "Image storage type accepted by BookStack (defaults to 'gallery')."}),
         ] = "gallery",
         uploaded_to: Annotated[
             Optional[int],
-            Field(
-                default=0,
-                ge=0,
-                description="Entity ID the image is attached to; defaults to 0 for gallery uploads.",
-            ),
-        ] = 0,
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_INT_SCHEMA), "description": "Entity (page) ID to attach the image to. Provide a valid page ID for uploads."}),
+        ] = None,
         id: Annotated[
             Optional[int],
-            Field(default=None, ge=1, description="Image ID used by read/update/delete operations."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_INT_SCHEMA), "description": "Image ID used by read/update/delete operations."}),
         ] = None,
         new_name: Annotated[
             Optional[str],
-            Field(default=None, min_length=1, description="Replacement image name for update operations."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_STRING_SCHEMA), "description": "Replacement image name for update operations."}),
         ] = None,
         new_image: Annotated[
             Optional[str],
-            Field(default=None, description="Replacement image payload as a base64 string, data URL, or HTTP/HTTPS URL."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_STRING_NO_MIN_SCHEMA), "description": "Replacement image payload as a base64 string, data URL, or HTTP/HTTPS URL."}),
         ] = None,
         offset: Annotated[
             Optional[int],
-            Field(default=None, ge=0, description="Number of records to skip when listing images."),
+            WithJsonSchema({"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}], "description": "Number of records to skip when listing images."}),
         ] = None,
         count: Annotated[
             Optional[int],
-            Field(default=None, ge=1, le=100, description="Number of records to return when listing images."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_INT_SCHEMA), "description": "Number of records to return when listing images."}),
         ] = None,
         sort: Annotated[
             Optional[str],
-            Field(default=None, description="Sort expression understood by BookStack (e.g. '-created_at')."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_STRING_NO_MIN_SCHEMA), "description": "Sort expression understood by BookStack (e.g. '-created_at')."}),
         ] = None,
         filters: Annotated[
-            Optional[Sequence[FilterEntry]],
-            Field(default=None, description="Collection of filters forwarded to BookStack as filter[<key>] parameters."),
+            Optional[list[dict]],
+            Field(
+                default=None,
+                description="Collection of filters forwarded to BookStack as filter[<key>] parameters.",
+                json_schema_extra={
+                    "items": {
+                        "type": "object",
+                        "required": ["key", "value"],
+                        "properties": {
+                            "key": {"type": "string"},
+                            "value": {"type": "string"}
+                        },
+                        "additionalProperties": False
+                    }
+                },
+            ),
+        ] = None,
+        request_heartbeat: Annotated[
+            Optional[bool],
+            Field(default=None, description="Ignored parameter (for MCP client compatibility)"),
         ] = None,
     ) -> Dict[str, Any]:
         """Unified CRUD interface for BookStack image gallery."""
 
         if operation in {"read", "delete", "update"}:
             _ensure(id is not None, "'id' is required for read/update/delete operations")
+        target_page_id = None if uploaded_to is None else _validate_positive_int(uploaded_to, "'uploaded_to'")
+
         if operation == "create":
             _ensure(bool(name), "'name' is required when creating an image")
             _ensure(bool(image), "Provide an image payload for create operations")
-        if operation == "update":
-            _ensure(bool(new_name) or bool(new_image), "Provide new_name, new_image, or both for update operations")
+            _ensure(
+                target_page_id is not None,
+                "'uploaded_to' is required when creating an image",
+                hint="Provide the page ID the image should be attached to.",
+                context={"operation": operation},
+            )
 
-        if operation == "create":
             prepared = _prepare_image_payload(image or "", name or _FALLBACK_FILE_NAME)
             files = {"image": (prepared.filename, prepared.content, prepared.mime_type)}
             payload: Dict[str, Any] = {"name": name}
             if image_type:
                 payload["type"] = image_type
-            if uploaded_to is not None:
-                payload["uploaded_to"] = uploaded_to
+            payload["uploaded_to"] = target_page_id
             response = _bookstack_request_form(
                 "POST",
                 "/api/image-gallery",
@@ -1460,6 +1914,8 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
             return {"operation": operation, "success": True, "data": response}
 
         if operation == "update":
+            _ensure(bool(new_name) or bool(new_image), "Provide new_name, new_image, or both for update operations")
+
             data_payload: Dict[str, Any] = {}
             files_payload: Dict[str, Tuple[str, bytes, str]] = {}
             if new_name:
@@ -1525,27 +1981,27 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
     def bookstack_search_images(
         query: Annotated[
             Optional[str],
-            Field(default=None, description="Text search across image names and descriptions."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_STRING_NO_MIN_SCHEMA), "description": "Text search across image names and descriptions."}),
         ] = None,
         extension: Annotated[
             Optional[str],
-            Field(default=None, description="File extension filter (e.g. .jpg, .png)."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_STRING_NO_MIN_SCHEMA), "description": "File extension filter (e.g. .jpg, .png)."}),
         ] = None,
         size_min: Annotated[
             Optional[int],
-            Field(default=None, ge=0, description="Minimum size in bytes."),
+            WithJsonSchema({"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}], "description": "Minimum size in bytes."}),
         ] = None,
         size_max: Annotated[
             Optional[int],
-            Field(default=None, ge=0, description="Maximum size in bytes."),
+            WithJsonSchema({"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}], "description": "Maximum size in bytes."}),
         ] = None,
         created_after: Annotated[
             Optional[str],
-            Field(default=None, description="Only return images created after this timestamp."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_STRING_NO_MIN_SCHEMA), "description": "Only return images created after this timestamp."}),
         ] = None,
         created_before: Annotated[
             Optional[str],
-            Field(default=None, description="Only return images created before this timestamp."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_STRING_NO_MIN_SCHEMA), "description": "Only return images created before this timestamp."}),
         ] = None,
         used_in: Annotated[
             Optional[Literal["books", "pages", "chapters"]],
@@ -1553,15 +2009,19 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
         ] = None,
         count: Annotated[
             Optional[int],
-            Field(default=None, ge=1, le=100, description="Results per page (default 20)."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_INT_SCHEMA), "description": "Results per page (default 20)."}),
         ] = None,
         offset: Annotated[
             Optional[int],
-            Field(default=None, ge=0, description="Pagination offset (default 0)."),
+            WithJsonSchema({"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}], "description": "Pagination offset (default 0)."}),
         ] = None,
         sort: Annotated[
             Optional[str],
-            Field(default=None, description="Sort expression supported by BookStack (e.g. '-created_at')."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_STRING_NO_MIN_SCHEMA), "description": "Sort expression supported by BookStack (e.g. '-created_at')."}),
+        ] = None,
+        request_heartbeat: Annotated[
+            Optional[bool],
+            Field(default=None, description="Ignored parameter (for MCP client compatibility)"),
         ] = None,
     ) -> Dict[str, Any]:
         """Advanced discovery tool for BookStack image gallery."""
@@ -1633,7 +2093,6 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         annotations={
             "title": "Batch Content Operations",
-            "destructiveHint": True,
         }
     )
     def bookstack_batch_operations(
@@ -1645,17 +2104,14 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
             EntityType,
             Field(description="Entity to operate on (book, bookshelf, chapter, page)."),
         ],
-        items: Annotated[
-            Sequence[BatchItem],
-            Field(min_length=1, description="List of items to process."),
-        ],
+        items: BatchItemsListInput,
         continue_on_error: Annotated[
             bool,
             Field(default=True, description="Continue processing when an item fails."),
         ] = True,
         batch_size: Annotated[
             Optional[int],
-            Field(default=None, ge=1, description="Number of items per batch (processed sequentially)."),
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_INT_SCHEMA), "description": "Number of items per batch (processed sequentially)."}),
         ] = None,
         dry_run: Annotated[
             bool,
@@ -1671,15 +2127,9 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
         successes: list[Dict[str, Any]] = []
         errors: list[Dict[str, Any]] = []
 
-        def build_prepared(item: BatchItem) -> PreparedOperation:
+        def build_prepared(item: Dict[str, Any]) -> PreparedOperation:
             item_id = item.get("id")
-            data = item.get("data") or {}
-            if not isinstance(data, dict):
-                raise _tool_error(
-                    "Each item's data must be an object",
-                    hint="Provide batch items as {'id': ..., 'data': {...}} structures.",
-                    context={"item": data},
-                )
+            data = _coerce_json_object(item.get("data"), label="batch item 'data'")
             kwargs = _extract_known_fields(data)
             kwargs["updates"] = data
             if operation == "bulk_create":
@@ -1692,6 +2142,7 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
                     content=kwargs.get("content"),
                     markdown=kwargs.get("markdown"),
                     html=kwargs.get("html"),
+                    cover_image=kwargs.get("cover_image"),
                     updates=kwargs.get("updates"),
                     book_id=kwargs.get("book_id"),
                     chapter_id=kwargs.get("chapter_id"),
@@ -1711,6 +2162,7 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
                     content=kwargs.get("content"),
                     markdown=kwargs.get("markdown"),
                     html=kwargs.get("html"),
+                    cover_image=kwargs.get("cover_image"),
                     updates=kwargs.get("updates"),
                     book_id=kwargs.get("book_id"),
                     chapter_id=kwargs.get("chapter_id"),

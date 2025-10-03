@@ -1,257 +1,123 @@
-# mcp-framework-server
+# BookStack MCP Server
 
-A Model Context Protocol (MCP) server built with mcp-framework.
+This repository hosts a **Python FastMCP-based server** that exposes consolidated tools for managing a BookStack instance. The flagship capabilities are the image gallery management workflows that power authoring experiences in downstream MCP clients.
 
-## Quick Start
+> **⚠️ DEPRECATION NOTICE**: The TypeScript/mcp-framework server (`src/` directory) is deprecated and no longer maintained. All development has moved to the Python FastMCP server (`fastmcp_server/` directory). Please migrate to the Python server for the latest features and bug fixes.
 
-```bash
-# Install dependencies
-npm install
-
-# Build the project
-npm run build
-
-```
-
-## Project Structure
-
-```
-mcp-framework-server/
-├── src/
-│   ├── tools/        # MCP Tools
-│   │   └── ExampleTool.ts
-│   └── index.ts      # Server entry point
-├── package.json
-└── tsconfig.json
-```
-
-## Adding Components
-
-The project comes with an example tool in `src/tools/ExampleTool.ts`. You can add more tools using the CLI:
+## Quick start
 
 ```bash
-# Add a new tool
-mcp add tool my-tool
-
-# Example tools you might create:
-mcp add tool data-processor
-mcp add tool api-client
-mcp add tool file-handler
+# Install Python dependencies for the FastMCP server
+pip install -r fastmcp_server/requirements.txt
 ```
 
-## Tool Development
-
-Example tool structure:
-
-```typescript
-import { MCPTool } from "mcp-framework";
-import { z } from "zod";
-
-interface MyToolInput {
-  message: string;
-}
-
-class MyTool extends MCPTool<MyToolInput> {
-  name = "my_tool";
-  description = "Describes what your tool does";
-
-  schema = {
-    message: {
-      type: z.string(),
-      description: "Description of this input parameter",
-    },
-  };
-
-  async execute(input: MyToolInput) {
-    // Your tool logic here
-    return `Processed: ${input.message}`;
-  }
-}
-
-export default MyTool;
-```
-
-## Publishing to npm
-
-1. Update your package.json:
-   - Ensure `name` is unique and follows npm naming conventions
-   - Set appropriate `version`
-   - Add `description`, `author`, `license`, etc.
-   - Check `bin` points to the correct entry file
-
-2. Build and test locally:
-   ```bash
-   npm run build
-   npm link
-   mcp-framework-server  # Test your CLI locally
-   ```
-
-3. Login to npm (create account if necessary):
-   ```bash
-   npm login
-   ```
-
-4. Publish your package:
-   ```bash
-   npm publish
-   ```
-
-After publishing, users can add it to their claude desktop client (read below) or run it with npx
-```
-
-## Using with Claude Desktop
-
-### Local Development
-
-Add this configuration to your Claude Desktop config file:
-
-**MacOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows**: `%APPDATA%/Claude/claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "mcp-framework-server": {
-      "command": "node",
-      "args":["/absolute/path/to/mcp-framework-server/dist/index.js"]
-    }
-  }
-}
-```
-
-### After Publishing
-
-Add this configuration to your Claude Desktop config file:
-
-**MacOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows**: `%APPDATA%/Claude/claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "mcp-framework-server": {
-      "command": "npx",
-      "args": ["mcp-framework-server"]
-    }
-  }
-}
-```
-
-## Building and Testing
-
-1. Make changes to your tools
-2. Run `npm run build` to compile
-3. The server will automatically load your tools on startup
-
-## Learn More
-
-- [MCP Framework Github](https://github.com/QuantGeekDev/mcp-framework)
-- [MCP Framework Docs](https://mcp-framework.com)
-
-
-
----
-
-## FastMCP 2.0 — Research & Migration Notes
-
-This section captures our evaluation of FastMCP 2.0 as an alternative to the current Node/TypeScript `mcp-framework` implementation.
-
-- Docs: https://gofastmcp.com/
-- Tools (schemas, annotations, output): https://gofastmcp.com/servers/tools
-- PyPI: https://pypi.org/project/fastmcp/
-
-### Why FastMCP
-
-- Pythonic decorator model: `@mcp.tool` turns functions into MCP tools.
-- Automatic JSON Schema generation from type hints (helps avoid draft 2020-12 schema issues).
-- Built-in HTTP transport; simpler to run without custom session plumbing.
-- Structured outputs per MCP 2025-06-18: dicts/dataclasses become machine-readable JSON automatically.
-- Async-first with good ergonomics; supports sync tools too.
-
-### Installation (docs reference)
-
-You can install FastMCP in a Python environment (venv/uv/conda). Example with pip:
+Launch the FastMCP server after exporting your BookStack credentials (see below):
 
 ```bash
-pip install fastmcp
-fastmcp --version
+cd fastmcp_server
+python3 -m fastmcp_server
 ```
 
-### Minimal Server (HTTP)
+### Required environment
 
-```python
+Copy `.env.example` to `.env` and populate these variables before invoking any BookStack tools:
+
+```
+BS_URL=https://your-bookstack.example.com
+BS_TOKEN_ID=...
+BS_TOKEN_SECRET=...
+```
+
+The API token must belong to a user that can view and manage the image gallery. Local helper scripts use `set -a && source .env` so the values apply to ad-hoc Python snippets as well.
+
+## BookStack tools
+
+The Python FastMCP server provides comprehensive BookStack management through consolidated tools:
+
+### Content Management
+- `bookstack_content_crud` — unified CRUD operations for books, bookshelves, chapters, and pages (Letta-compatible)
+- `bookstack_list_content` — list and filter content entities with pagination
+- `bookstack_search` — full-text search across BookStack content
+- `bookstack_batch_operations` — bulk create, update, and delete operations
+
+### Image Gallery Management
+- `bookstack_manage_images` — unified create/read/update/delete/list interface for images
+- `bookstack_search_images` — advanced discovery with extension, date, size, and usage filters
+
+All tools are registered by `fastmcp_server/bookstack/tools.py` and surfaced automatically when the FastMCP server starts.
+
+> **📘 Letta Compatibility**: If you're using Letta as your MCP client, please read [docs/LETTA_COMPATIBILITY.md](docs/LETTA_COMPATIBILITY.md) for important compatibility requirements and best practices.
+
+### Image uploads from URLs
+
+`bookstack_manage_images` accepts three input shapes for the `image`/`new_image` fields during create and update operations:
+
+1. Plain base64 strings
+2. Data URLs (`data:image/png;base64,...`)
+3. HTTP or HTTPS URLs
+
+When a URL is supplied the tool:
+
+- Streams the remote image with a 30 second timeout and a 50 MB limit
+- Restricts schemes to HTTP/HTTPS to avoid SSRF
+- Validates the MIME type against BookStack's accepted formats (jpeg, png, gif, webp, bmp, tiff, svg+xml)
+- Infers a filename from the URL path when one is not supplied
+
+### Required BookStack parameters
+
+BookStack's `POST /api/image-gallery` endpoint enforces two additional fields beyond the binary payload:
+
+- `type` — must be `gallery` for standard content images (use `drawio` only when uploading diagrams.net PNGs)
+- `uploaded_to` — the numeric page ID to attach the image to. BookStack rejects uploads without a real page context.
+
+The tool surfaces these as optional inputs named `image_type` and `uploaded_to`. Default values of `gallery` and `0` preserve backward compatibility while allowing callers to target specific pages when required.
+
+### Manual verification against a live instance
+
+After exporting your environment variables you can confirm an end-to-end URL upload with the following snippet (replace `PAGE_ID` with an existing page id):
+
+```bash
+cd /opt/stacks/bookstack-mcp/Bookstack-MCP
+set -a && source .env && set +a
+python3 - <<'PY'
+import asyncio, json, time
 from fastmcp import FastMCP
+from fastmcp_server.bookstack.tools import register_bookstack_tools
 
-mcp = FastMCP("BookStack MCP")
-
-@mcp.tool
-def ping(name: str) -> str:
-    """Health check"""
-    return f"Hello, {name}!"
-
-if __name__ == "__main__":
-    mcp.run(transport="http", port=8000)
-```
-
-CLI alternative:
-
-```bash
-fastmcp run path/to/server.py:mcp --transport http --port 8000
-```
-
-### Minimal Client (HTTP)
-
-```python
-import asyncio
-from fastmcp import Client
+TEST_IMAGE_URL = "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png"
+PAGE_ID = 39  # replace with a page id from your BookStack instance
 
 async def main():
-    async with Client("http://localhost:8000/mcp") as client:
-        res = await client.call_tool("ping", {"name": "world"})
-        print(res)
+    mcp = FastMCP("manual-test")
+    register_bookstack_tools(mcp)
+    tool = await mcp.get_tool("bookstack_manage_images")
+    result = await tool.run({
+        "operation": "create",
+        "name": f"URL Upload Test {int(time.time())}",
+        "image": TEST_IMAGE_URL,
+        "uploaded_to": PAGE_ID,
+    })
+    print(json.dumps(json.loads(result.content[0].text), indent=2))
 
 asyncio.run(main())
+PY
 ```
 
-### Tools: Schemas and Output
+You should receive a JSON payload describing the uploaded image, including thumbnails and the `uploaded_to` identifier. A `422` error means BookStack rejected the request (common causes: missing `uploaded_to`, disallowed MIME type, image exceeding the 50 MB limit). A `404` response typically indicates the API token lacks gallery permissions.
 
-- Parameters are derived from function signature + Python type hints (supports `Annotated` and `pydantic.Field` constraints).
-- Return values:
-  - `dict`/dataclass/Pydantic → structured content automatically (plus traditional text content).
-  - Primitive returns (e.g., `int`, `str`) → structured output is generated when a return type is provided (wrapped under `result`) or when `output_schema` is specified.
-- Optional annotations for clients (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`).
+## Testing
 
-### BookStack Example: List Books Tool
+Run the Python unit tests for the BookStack tools:
 
-```python
-from fastmcp import FastMCP
-import os, requests
-
-mcp = FastMCP("BookStack MCP")
-
-@mcp.tool
-def bookstack_list_books(offset: int = 0, count: int = 50) -> dict:
-    """List books from BookStack"""
-    base = os.environ["BS_URL"].rstrip("/")
-    url = f"{base}/api/books?offset={offset}&count={count}"
-    headers = {
-        "Authorization": f"Token {os.environ['BS_TOKEN_ID']}:{os.environ['BS_TOKEN_SECRET']}"
-    }
-    r = requests.get(url, headers=headers, timeout=30)
-    r.raise_for_status()
-    return r.json()
+```bash
+cd fastmcp_server
+python3 -m pytest tests/test_manage_images.py -v
 ```
 
-### Suggested Migration Plan
+The suite covers URL handling, timeout and size enforcement, invalid scheme rejection, and the forwarding of `type`/`uploaded_to` metadata.
 
-1) Create a new Python FastMCP server (e.g., `fastmcp_server/my_server.py`).
-2) Implement one BookStack tool first (`bookstack_list_books`) and verify over HTTP via FastMCP client.
-3) Port remaining BookStack tools iteratively (list/read/create/update/delete/search/images).
-4) Optionally define dataclasses or Pydantic models for structured outputs to get predictable schemas.
-5) When ready, update downstream clients (Claude Desktop etc.) to point to the new HTTP endpoint.
+## Additional references
 
-### Considerations
-
-- Pin versions for stability in production (e.g., `fastmcp==2.11.x`).
-- Choose an HTTP client (`requests` or `httpx`); the example uses `requests`.
-- You can run Node and Python servers in parallel during the transition and cut over tool-by-tool.
+- FastMCP docs: https://gofastmcp.com/
+- BookStack API reference: https://www.bookstackapp.com/docs/api/
+- Product requirements for the image gallery tools: `docs/PRD-Image-Gallery-Management.md`

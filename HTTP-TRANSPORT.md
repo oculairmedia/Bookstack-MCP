@@ -1,6 +1,8 @@
 # HTTP Transport for Bookstack MCP Server
 
-This document describes the HTTP transport implementation for the Bookstack MCP server, based on the MCP Streamable HTTP protocol (version 2025-06-18).
+> **⚠️ DEPRECATED**: This document describes the deprecated TypeScript/mcp-framework server. The Python FastMCP server uses HTTP transport by default. See the main [README.md](README.md) for current documentation.
+
+This document describes the HTTP transport implementation for the **deprecated** TypeScript Bookstack MCP server, based on the MCP Streamable HTTP protocol (version 2025-06-18).
 
 ## Features
 

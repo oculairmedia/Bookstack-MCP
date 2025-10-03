@@ -1,6 +1,8 @@
 # FastMCP 2.0 Research & Migration Plan
 
-This document captures our evaluation of FastMCP 2.0 and a concrete plan to migrate from the current Node/TypeScript `mcp-framework` server to a Python-based FastMCP server.
+> **✅ MIGRATION COMPLETE**: This migration has been successfully completed. The Python FastMCP server is now the primary and only supported server. The TypeScript/mcp-framework server is deprecated.
+
+This document captures our evaluation of FastMCP 2.0 and the completed migration from the Node/TypeScript `mcp-framework` server to a Python-based FastMCP server.
 
 ## Objectives
 

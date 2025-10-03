@@ -1,7 +1,8 @@
 {
   "name": "mcp-framework-server",
   "version": "0.0.1",
-  "description": "mcp-framework-server MCP server",
+  "description": "⚠️ DEPRECATED: TypeScript MCP server - Use Python FastMCP server in fastmcp_server/ instead",
+  "deprecated": "This TypeScript server is deprecated. Please use the Python FastMCP server located in the fastmcp_server/ directory.",
   "type": "module",
   "bin": {
     "mcp-framework-server": "./dist/index.js"
