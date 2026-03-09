@@ -20,11 +20,12 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: fastmcp_server/requirements.txt
 
       - name: Install Python dependencies
         working-directory: fastmcp_server
         run: |
-          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Run FastMCP pytest suite
@@ -32,7 +33,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
         run: |
           cd fastmcp_server
-          pytest
+          pytest -q
 
   build-image:
     runs-on: ubuntu-latest
@@ -62,5 +63,7 @@ jobs:
         with:
           context: .
           push: ${{ github.event_name == 'push' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

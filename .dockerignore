@@ -6,3 +6,10 @@ __pycache__/
 *.pyc
 .beads/
 logs/
+.env
+fastmcp_server/.pytest_cache/
+fastmcp_server/__pycache__/
+fastmcp_server/bookstack/__pycache__/
+fastmcp_server/tests/__pycache__/
+fastmcp_server/htmlcov/
+fastmcp_server/logs/

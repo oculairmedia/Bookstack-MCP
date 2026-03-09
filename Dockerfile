@@ -1,17 +1,14 @@
+# syntax=docker/dockerfile:1.7
 FROM python:3.11-slim AS runtime
 
-ENV PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN apt-get update \
- && apt-get install -y --no-install-recommends curl \
- && rm -rf /var/lib/apt/lists/*
-
 # Install Python dependencies first for better Docker layer caching
 COPY fastmcp_server/requirements.txt ./fastmcp_server/requirements.txt
-RUN pip install --no-cache-dir -r fastmcp_server/requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r fastmcp_server/requirements.txt
 
 # Copy application source
 COPY fastmcp_server ./fastmcp_server
