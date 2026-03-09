@@ -21,8 +21,14 @@ services:
       - BS_TOKEN_SECRET=${BS_TOKEN_SECRET}
       - NODE_ENV=${NODE_ENV:-production}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3054/health"]
-      interval: 30s
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; s=socket.create_connection(('localhost', 3054), 5); s.close()",
+        ]
+      interval: 10s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 10s
