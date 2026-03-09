@@ -1,29 +1,11 @@
 import { z } from "zod";
 import { BookstackTool } from "../bookstack/BookstackTool.js";
-declare const schema: z.ZodObject<{
-    offset: z.ZodOptional<z.ZodNumber>;
-    count: z.ZodOptional<z.ZodNumber>;
-}, "strip", z.ZodTypeAny, {
-    offset?: number | undefined;
-    count?: number | undefined;
-}, {
-    offset?: number | undefined;
-    count?: number | undefined;
-}>;
+declare const schema: any;
 type ListPagesInput = z.infer<typeof schema>;
 declare class BookstackListPagesTool extends BookstackTool<ListPagesInput> {
     name: string;
     description: string;
-    schema: z.ZodObject<{
-        offset: z.ZodOptional<z.ZodNumber>;
-        count: z.ZodOptional<z.ZodNumber>;
-    }, "strip", z.ZodTypeAny, {
-        offset?: number | undefined;
-        count?: number | undefined;
-    }, {
-        offset?: number | undefined;
-        count?: number | undefined;
-    }>;
+    schema: any;
     execute(input: ListPagesInput): Promise<import("../bookstack/BookstackTool.js").ToolContent[]>;
 }
 export default BookstackListPagesTool;

@@ -1,3 +1,12 @@
+/**
+ * ⚠️ DEPRECATED: This TypeScript/mcp-framework server is deprecated and no longer maintained.
+ *
+ * Please use the Python FastMCP server instead:
+ *   cd fastmcp_server
+ *   python3 -m fastmcp_server
+ *
+ * See src/DEPRECATED.md for migration instructions.
+ */
 import "./tools/BookstackListBooksTool.js";
 import "./tools/BookstackListBookshelvesTool.js";
 import "./tools/BookstackListChaptersTool.js";
