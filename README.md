@@ -57,7 +57,7 @@ All tools are registered by `fastmcp_server/bookstack/tools.py` and surfaced aut
 When a URL is supplied the tool:
 
 - Streams the remote image with a 30 second timeout and a 50 MB limit
-- Restricts schemes to HTTP/HTTPS to avoid SSRF
+- Restricts schemes to HTTP/HTTPS and blocks loopback, private, link-local, reserved, and redirect-based internal targets
 - Validates the MIME type against BookStack's accepted formats (jpeg, png, gif, webp, bmp, tiff, svg+xml)
 - Infers a filename from the URL path when one is not supplied
 

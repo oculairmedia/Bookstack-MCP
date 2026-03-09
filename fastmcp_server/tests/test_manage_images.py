@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import base64
+import ipaddress
 import json
+import socket
 from typing import Any, Dict
 
 import pytest
@@ -21,6 +23,29 @@ def clear_image_cache() -> None:
     tools._invalidate_list_cache()
     yield
     tools._invalidate_list_cache()
+
+
+@pytest.fixture(autouse=True)
+def stub_public_dns(monkeypatch: MonkeyPatch) -> None:
+    """Resolve test hosts deterministically without real network access."""
+
+    def fake_getaddrinfo(host: str, port: int, type: int = 0, **kwargs):
+        try:
+            ip_text = str(ipaddress.ip_address(host))
+        except ValueError:
+            mapping = {
+                "example.com": "93.184.216.34",
+                "cdn.example.com": "93.184.216.35",
+                "slow-server.example.com": "93.184.216.36",
+                "internal.example.com": "10.0.0.25",
+            }
+            ip_text = mapping.get(host, "93.184.216.34")
+
+        family = socket.AF_INET6 if ":" in ip_text else socket.AF_INET
+        sockaddr = (ip_text, port, 0, 0) if family == socket.AF_INET6 else (ip_text, port)
+        return [(family, type or socket.SOCK_STREAM, 6, "", sockaddr)]
+
+    monkeypatch.setattr(tools.socket, "getaddrinfo", fake_getaddrinfo)
 
 
 @pytest.mark.asyncio
@@ -199,6 +224,7 @@ async def test_image_create_from_url(monkeypatch: MonkeyPatch) -> None:
         assert url == "https://example.com/image.png"
         assert kwargs.get("timeout") == 30
         assert kwargs.get("stream") is True
+        assert kwargs.get("allow_redirects") is False
         return FakeResponse()
 
     def fake_form(method: str, path: str, *, data=None, files=None):
@@ -357,6 +383,86 @@ async def test_image_create_from_url_invalid(monkeypatch: MonkeyPatch) -> None:
         })
 
     assert "not supported" in str(exc.value).lower() or "ftp" in str(exc.value).lower()
+
+
+@pytest.mark.asyncio
+async def test_image_create_from_url_rejects_loopback_target(monkeypatch: MonkeyPatch) -> None:
+    """Reject direct loopback URLs before issuing an outbound request."""
+    mcp = FastMCP("test")
+    register_bookstack_tools(mcp)
+
+    monkeypatch.setattr("requests.get", pytest.fail)
+
+    tool = await mcp.get_tool("bookstack_manage_images")
+
+    with pytest.raises(ToolError) as exc:
+        await tool.run({
+            "operation": "create",
+            "name": "loopback-test",
+            "image": "http://127.0.0.1/image.png",
+            "uploaded_to": DEFAULT_PAGE_ID,
+        })
+
+    assert "disallowed network target" in str(exc.value).lower()
+
+
+@pytest.mark.asyncio
+async def test_image_create_from_url_rejects_private_dns_result(monkeypatch: MonkeyPatch) -> None:
+    """Reject URLs whose DNS resolution lands in a private network range."""
+    mcp = FastMCP("test")
+    register_bookstack_tools(mcp)
+
+    monkeypatch.setattr("requests.get", pytest.fail)
+
+    tool = await mcp.get_tool("bookstack_manage_images")
+
+    with pytest.raises(ToolError) as exc:
+        await tool.run({
+            "operation": "create",
+            "name": "private-dns-test",
+            "image": "https://internal.example.com/image.png",
+            "uploaded_to": DEFAULT_PAGE_ID,
+        })
+
+    assert "disallowed network target" in str(exc.value).lower()
+
+
+@pytest.mark.asyncio
+async def test_image_create_from_url_rejects_redirect_to_loopback(monkeypatch: MonkeyPatch) -> None:
+    """Reject redirects that point at loopback or other blocked targets."""
+    mcp = FastMCP("test")
+    register_bookstack_tools(mcp)
+
+    request_urls = []
+
+    class RedirectResponse:
+        status_code = 302
+        headers = {"location": "http://127.0.0.1/private.png"}
+
+        def raise_for_status(self):
+            pass
+
+        def close(self):
+            pass
+
+    def fake_get(url, **kwargs):
+        request_urls.append(url)
+        return RedirectResponse()
+
+    monkeypatch.setattr("requests.get", fake_get)
+
+    tool = await mcp.get_tool("bookstack_manage_images")
+
+    with pytest.raises(ToolError) as exc:
+        await tool.run({
+            "operation": "create",
+            "name": "redirect-test",
+            "image": "https://example.com/image.png",
+            "uploaded_to": DEFAULT_PAGE_ID,
+        })
+
+    assert request_urls == ["https://example.com/image.png"]
+    assert "disallowed network target" in str(exc.value).lower()
 
 
 @pytest.mark.asyncio

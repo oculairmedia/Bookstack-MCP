@@ -4,17 +4,19 @@ from __future__ import annotations
 
 import base64
 import copy
+import ipaddress
 import json
 import logging
 import hashlib
 import mimetypes
 import os
 import re
+import socket
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated, Any, Dict, Literal, Optional, Sequence, Tuple, Union
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 
 import requests
 from fastmcp import FastMCP
@@ -359,6 +361,7 @@ _DEFAULT_MIME_TYPE = "application/octet-stream"
 # Image URL fetching configuration
 _MAX_IMAGE_SIZE_BYTES = 50 * 1024 * 1024  # 50MB limit
 _REQUEST_TIMEOUT_SECONDS = 30
+_MAX_URL_REDIRECTS = 3
 _ALLOWED_URL_SCHEMES = {"http", "https"}
 _ALLOWED_MIME_TYPES = {
     "image/jpeg",
@@ -645,6 +648,81 @@ def _extract_filename_from_url(url: str, fallback: str) -> str:
     return fallback
 
 
+def _classify_disallowed_ip(ip_text: str) -> Optional[str]:
+    """Return the reason an IP target is unsafe for outbound fetches."""
+    ip_addr = ipaddress.ip_address(ip_text)
+
+    if ip_addr.is_loopback:
+        return "loopback"
+    if ip_addr.is_private:
+        return "private"
+    if ip_addr.is_link_local:
+        return "link-local"
+    if ip_addr.is_multicast:
+        return "multicast"
+    if ip_addr.is_reserved:
+        return "reserved"
+    if ip_addr.is_unspecified:
+        return "unspecified"
+    return None
+
+
+def _resolve_url_targets(url: str) -> Sequence[str]:
+    """Resolve a URL hostname to concrete IP addresses."""
+    parsed = urlparse(url)
+    hostname = parsed.hostname
+    if not hostname:
+        raise _tool_error(
+            "Invalid URL format",
+            hint="Provide a valid HTTP or HTTPS URL with a hostname.",
+            context={"url": url},
+        )
+
+    try:
+        addrinfo = socket.getaddrinfo(
+            hostname,
+            parsed.port or (443 if parsed.scheme.lower() == "https" else 80),
+            type=socket.SOCK_STREAM,
+        )
+    except socket.gaierror as exc:
+        raise _tool_error(
+            "Failed to resolve image host",
+            hint="Verify the hostname is correct and publicly reachable.",
+            context={"url": url, "hostname": hostname},
+        ) from exc
+
+    resolved_ips: list[str] = []
+    for entry in addrinfo:
+        ip_text = entry[4][0]
+        if ip_text not in resolved_ips:
+            resolved_ips.append(ip_text)
+
+    if not resolved_ips:
+        raise _tool_error(
+            "Failed to resolve image host",
+            hint="Verify the hostname is correct and publicly reachable.",
+            context={"url": url, "hostname": hostname},
+        )
+
+    return resolved_ips
+
+
+def _validate_remote_image_target(url: str) -> None:
+    """Reject URLs that resolve to internal or otherwise unsafe IP ranges."""
+    blocked_targets = []
+    for ip_text in _resolve_url_targets(url):
+        reason = _classify_disallowed_ip(ip_text)
+        if reason:
+            blocked_targets.append({"ip": ip_text, "reason": reason})
+
+    if blocked_targets:
+        raise _tool_error(
+            "URL resolves to a disallowed network target",
+            hint="Use a publicly reachable HTTP or HTTPS image URL.",
+            context={"url": url, "blocked_targets": blocked_targets},
+        )
+
+
 def _fetch_image_from_url(url: str, fallback_name: str) -> PreparedImage:
     """Fetch image data from HTTP/HTTPS URL with security controls."""
 
@@ -655,18 +733,48 @@ def _fetch_image_from_url(url: str, fallback_name: str) -> PreparedImage:
             context={"url": url}
         )
 
+    current_url = url
+    response = None
+
     try:
-        # Security: Set reasonable timeout and size limits
-        response = requests.get(
-            url,
-            timeout=_REQUEST_TIMEOUT_SECONDS,
-            stream=True,
-            headers={
-                'User-Agent': 'BookStack-MCP/1.0',
-                'Accept': 'image/*'
-            }
-        )
-        response.raise_for_status()
+        for redirect_count in range(_MAX_URL_REDIRECTS + 1):
+            _validate_remote_image_target(current_url)
+
+            # Redirects are validated hop-by-hop so internal targets cannot be reached.
+            response = requests.get(
+                current_url,
+                timeout=_REQUEST_TIMEOUT_SECONDS,
+                stream=True,
+                allow_redirects=False,
+                headers={
+                    'User-Agent': 'BookStack-MCP/1.0',
+                    'Accept': 'image/*'
+                }
+            )
+
+            if 300 <= response.status_code < 400:
+                location = response.headers.get("location")
+                if not location:
+                    raise _tool_error(
+                        "Redirect response missing Location header",
+                        context={"url": current_url, "status_code": response.status_code},
+                    )
+                if redirect_count >= _MAX_URL_REDIRECTS:
+                    raise _tool_error(
+                        "Too many redirects while fetching image",
+                        hint=f"Limit redirects to {_MAX_URL_REDIRECTS} hops or use the final URL directly.",
+                        context={"url": url},
+                    )
+                current_url = urljoin(current_url, location)
+                if hasattr(response, "close"):
+                    response.close()
+                response = None
+                continue
+
+            response.raise_for_status()
+            break
+        else:  # pragma: no cover - defensive guard
+            raise _tool_error("Too many redirects while fetching image", context={"url": url})
 
         # Check content length before downloading
         content_length = response.headers.get('content-length')
@@ -699,14 +807,14 @@ def _fetch_image_from_url(url: str, fallback_name: str) -> PreparedImage:
         mime_type = response.headers.get('content-type', '').split(';')[0].lower()
         if not mime_type or mime_type not in _ALLOWED_MIME_TYPES:
             # Fallback to guessing from URL extension
-            guessed_type, _ = mimetypes.guess_type(url)
+            guessed_type, _ = mimetypes.guess_type(current_url)
             if guessed_type and guessed_type in _ALLOWED_MIME_TYPES:
                 mime_type = guessed_type
             else:
                 mime_type = _DEFAULT_MIME_TYPE
 
         # Extract filename
-        filename = _extract_filename_from_url(url, fallback_name)
+        filename = _extract_filename_from_url(current_url, fallback_name)
 
         return PreparedImage(
             filename=filename,
@@ -747,6 +855,9 @@ def _fetch_image_from_url(url: str, fallback_name: str) -> PreparedImage:
             "Unexpected error while fetching image from URL",
             context={"url": url, "error": str(exc)}
         ) from exc
+    finally:
+        if response is not None and hasattr(response, "close"):
+            response.close()
 
 
 def _validate_positive_int(value: Optional[Any], label: str) -> int:
