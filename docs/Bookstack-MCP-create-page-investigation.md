@@ -64,7 +64,7 @@ Automated BookStack page creation requests sent through the MCP bridge fail for 
 ## Next Steps for Developers
 
 1. Patch `tools_simplified.py` per the recommendations and add regression tests that call `bookstack_content_crud` and `bookstack_batch_operations` to create pages using markdown-only payloads.
-2. Consider adding higher-level TypeScript coverage (`src/bookstack/BookstackTool.ts`) once the server helpers are corrected.
+2. Add higher-level FastMCP coverage if the simplified helpers gain more page-creation variants.
 3. Once fixes land, run the existing `fastmcp_server/tests/test_manage_content.py` (or add a new test) to cover book-level page creation without chapters.
 4. Update runtime documentation (`docs/`, README sections, or tool annotations) so downstream agents know which parameters to send.
 

@@ -1,8 +1,8 @@
 # FastMCP 2.0 Research & Migration Plan
 
-> **✅ MIGRATION COMPLETE**: This migration has been successfully completed. The Python FastMCP server is now the primary and only supported server. The TypeScript/mcp-framework server is deprecated.
+> **✅ MIGRATION COMPLETE**: This migration has been successfully completed. The Python FastMCP server is now the primary and only supported server. The old TypeScript/mcp-framework server has been removed from the repository.
 
-This document captures our evaluation of FastMCP 2.0 and the completed migration from the Node/TypeScript `mcp-framework` server to a Python-based FastMCP server.
+This document captures our evaluation of FastMCP 2.0 and the completed migration from the former Node/TypeScript `mcp-framework` server to a Python-based FastMCP server.
 
 ## Objectives
 
@@ -203,4 +203,3 @@ class ListBooksResult:
 3) Port read tools, then write tools.
 4) Optionally introduce dataclasses/Pydantic for structured outputs.
 5) Plan cutover window and update clients.
-

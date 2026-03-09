@@ -175,8 +175,7 @@ Use the checklist in `INSPECTOR-SESSION-RESULTS.md` to track:
 If you modify the server code:
 
 1. Stop the Inspector (`Ctrl+C`)
-2. Rebuild if needed: `cd .. && npm run build`
-3. Restart the Inspector:
+2. Restart the Inspector:
    ```bash
    cd fastmcp_server
    npx @modelcontextprotocol/inspector python run_stdio.py
@@ -188,4 +187,3 @@ If you modify the server code:
 - Session results template: `INSPECTOR-SESSION-RESULTS.md`
 - [MCP Inspector Docs](https://modelcontextprotocol.io/docs/tools/inspector)
 - [FastMCP Docs](https://gofastmcp.com/)
-

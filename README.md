@@ -2,8 +2,6 @@
 
 This repository hosts a **Python FastMCP-based server** that exposes consolidated tools for managing a BookStack instance. The flagship capabilities are the image gallery management workflows that power authoring experiences in downstream MCP clients.
 
-> **⚠️ DEPRECATION NOTICE**: The TypeScript/mcp-framework server (`src/` directory) is deprecated and no longer maintained. All development has moved to the Python FastMCP server (`fastmcp_server/` directory). Please migrate to the Python server for the latest features and bug fixes.
-
 ## Quick start
 
 ```bash
