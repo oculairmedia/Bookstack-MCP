@@ -81,7 +81,7 @@ def update_page(id: int, book_id: int = None, chapter_id: int = None, name: str 
     if markdown and html:
         return json.dumps({"error": "Cannot specify both markdown and html content"})
 
-    base_url = os.environ.get("BS_URL", "https://knowledge.oculair.ca").rstrip("/")
+    base_url = os.environ.get("BS_URL", "http://192.168.50.80:8087").rstrip("/")
     token_id = os.environ.get("BS_TOKEN_ID")
     token_secret = os.environ.get("BS_TOKEN_SECRET")
 
@@ -151,7 +151,7 @@ if __name__ == "__main__":
     print("Testing update_page tool...")
     
     # Set up environment with credentials
-    os.environ["BS_URL"] = "https://knowledge.oculair.ca"
+    os.environ["BS_URL"] = "http://192.168.50.80:8087"
     os.environ["BS_TOKEN_ID"] = "POnHR9Lbvm73T2IOcyRSeAqpA8bSGdMT"
     os.environ["BS_TOKEN_SECRET"] = "735wM5dScfUkcOy7qcrgqQ1eC5fBF7IE"
     

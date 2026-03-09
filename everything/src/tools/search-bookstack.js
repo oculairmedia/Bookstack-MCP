@@ -41,7 +41,7 @@ export async function handleSearchBookstack(server, args) {
         }
 
         // Get environment variables with fallbacks
-        const baseUrl = process.env.BS_URL || "https://knowledge.oculair.ca";
+        const baseUrl = process.env.BS_URL || "http://192.168.50.80:8087";
         const tokenId = process.env.BS_TOKEN_ID || "POnHR9Lbvm73T2IOcyRSeAqpA8bSGdMT";
         const tokenSecret = process.env.BS_TOKEN_SECRET || "735wM5dScfUkcOy7qcrgqQ1eC5fBF7IE";
 

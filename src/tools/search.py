@@ -56,7 +56,7 @@ def search(query: str, page: int = None, count: int = None) -> str:
     if not isinstance(query, str) or not query.strip():
         return json.dumps({"error": "Valid search query is required"})
 
-    base_url = os.environ.get("BS_URL", "https://knowledge.oculair.ca").rstrip("/")
+    base_url = os.environ.get("BS_URL", "http://192.168.50.80:8087").rstrip("/")
     token_id = os.environ.get("BS_TOKEN_ID")
     token_secret = os.environ.get("BS_TOKEN_SECRET")
 

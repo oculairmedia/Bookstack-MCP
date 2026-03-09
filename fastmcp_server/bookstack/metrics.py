@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
 from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from functools import wraps
+from typing import Any, Dict, List, Optional
 import threading
 
 
@@ -271,6 +272,7 @@ def get_metrics_collector() -> MetricsCollector:
 def track_request(method: str, endpoint: str):
     """Decorator to track request metrics."""
     def decorator(func):
+        @wraps(func)
         def wrapper(*args, **kwargs):
             start_time = time.time()
             error = None
@@ -294,6 +296,7 @@ def track_request(method: str, endpoint: str):
 def track_tool(tool_name: str):
     """Decorator to track tool execution metrics."""
     def decorator(func):
+        @wraps(func)
         def wrapper(*args, **kwargs):
             start_time = time.time()
             error = None
@@ -312,4 +315,3 @@ def track_tool(tool_name: str):
         
         return wrapper
     return decorator
-

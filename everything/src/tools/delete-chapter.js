@@ -16,7 +16,7 @@ export async function handleDeleteChapter(server, args) {
 
         // Get environment variables
         // Use the provided credentials directly
-        const baseUrl = "https://knowledge.oculair.ca";
+        const baseUrl = "http://192.168.50.80:8087";
         const tokenId = "POnHR9Lbvm73T2IOcyRSeAqpA8bSGdMT";
         const tokenSecret = "735wM5dScfUkcOy7qcrgqQ1eC5fBF7IE";
 

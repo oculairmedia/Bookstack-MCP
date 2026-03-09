@@ -45,7 +45,7 @@ export class BookstackClient {
   private readonly origin: string;
 
   private constructor() {
-    const baseUrl = (process.env.BS_URL || "https://knowledge.oculair.ca").trim();
+    const baseUrl = (process.env.BS_URL || "http://192.168.50.80:8087").trim();
     const tokenId = process.env.BS_TOKEN_ID;
     const tokenSecret = process.env.BS_TOKEN_SECRET;
 

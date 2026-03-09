@@ -85,6 +85,43 @@ async def test_create_page_requires_scope_hint() -> None:
 
 
 @pytest.mark.asyncio
+async def test_create_page_with_book_scope_omits_chapter(monkeypatch: MonkeyPatch) -> None:
+    captured: Dict[str, Any] = {}
+
+    def fake_request(method: str, path: str, *, params=None, json=None):
+        captured["method"] = method
+        captured["path"] = path
+        captured["params"] = params
+        captured["json"] = json
+        return {"id": 222}
+
+    monkeypatch.setattr(tools, "_bookstack_request", fake_request)
+
+    mcp = FastMCP("test")
+    register_bookstack_tools(mcp)
+    tool = await mcp.get_tool("bookstack_manage_content")
+
+    result = await tool.run(
+        {
+            "operation": "create",
+            "entity_type": "page",
+            "name": "Top Level Page",
+            "book_id": 41,
+            "markdown": "# Hello",
+        }
+    )
+
+    data = json.loads(result.content[0].text)
+    assert data["success"] is True
+    payload = captured["json"]
+    assert captured["method"] == "POST"
+    assert captured["path"] == "/api/pages"
+    assert payload["book_id"] == 41
+    assert "chapter_id" not in payload
+    assert payload["markdown"] == "# Hello"
+
+
+@pytest.mark.asyncio
 async def test_downstream_toolerror_is_propagated() -> None:
     mcp = FastMCP("test")
     register_bookstack_tools(mcp)

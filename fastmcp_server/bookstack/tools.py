@@ -5,6 +5,8 @@ from __future__ import annotations
 import base64
 import copy
 import json
+import logging
+import hashlib
 import mimetypes
 import os
 import re
@@ -20,11 +22,42 @@ from pydantic import Field
 from pydantic.json_schema import WithJsonSchema
 from typing_extensions import TypedDict
 
+from .cache import bookstack_cache
+from .metrics import get_metrics_collector, track_tool
+from .validators import BookStackValidator, InputValidator, ValidationError
+
 try:  # FastMCP provides ToolError for structured failures
     from fastmcp import ToolError
 except ImportError:  # pragma: no cover - fallback for older FastMCP releases
     class ToolError(RuntimeError):
         """Fallback ToolError if fastmcp.ToolError is unavailable."""
+
+
+class JSONFormatter(logging.Formatter):
+    """Minimal JSON log formatter for structured log output."""
+
+    def format(self, record: logging.LogRecord) -> str:  # noqa: D401 - simple override
+        log_entry = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "level": record.levelname,
+            "message": record.getMessage(),
+            "logger": record.name,
+        }
+        if record.exc_info:
+            log_entry["exception"] = self.formatException(record.exc_info)
+        context = getattr(record, "context", None)
+        if context:
+            log_entry["context"] = context
+        return json.dumps(log_entry, ensure_ascii=False)
+
+
+logger = logging.getLogger("bookstack.mcp")
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(JSONFormatter())
+    logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+logger.propagate = False
 
 
 EntityType = Literal["book", "bookshelf", "chapter", "page"]
@@ -297,9 +330,8 @@ class PreparedImage:
 
 @dataclass
 class CacheEntry:
-    """Cached image list response."""
+    """Compatibility wrapper for cached image list responses."""
 
-    timestamp: float
     data: Any
     metadata: Optional[Dict[str, Any]] = None
 
@@ -318,8 +350,6 @@ _LIST_BASE_PATHS: Dict[ListEntityType, str] = {
     "pages": _ENTITY_BASE_PATHS["page"],
 }
 
-_LIST_CACHE: Dict[str, CacheEntry] = {}
-_LIST_CACHE_TTL_SECONDS = 30
 _DATA_URL_RE = re.compile(r"^data:([^;,]+)?(;base64)?,(.*)$", re.IGNORECASE)
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 
@@ -355,6 +385,131 @@ _CONTENT_KNOWN_FIELDS = (
     "cover_image",
     "priority",
 )
+
+
+def _select_cache_bucket(method: str, path: str):
+    """Return the SmartCache bucket for a request path."""
+
+    if method.upper() != "GET":
+        return None
+
+    if path.startswith("/api/books") or path.startswith("/api/bookshelves"):
+        return bookstack_cache.books
+    if path.startswith("/api/pages") or path.startswith("/api/chapters"):
+        return bookstack_cache.pages
+    if path.startswith("/api/image-gallery"):
+        return bookstack_cache.images
+    if path.startswith("/api/search"):
+        return bookstack_cache.search
+    return None
+
+
+def _cache_ttl_for(path: str) -> float:
+    """Determine a TTL for cached content based on endpoint."""
+
+    if "/image" in path:
+        return 900.0  # 15 minutes
+    if "/search" in path:
+        return 180.0  # 3 minutes
+    if path.startswith("/api/pages") or path.startswith("/api/chapters"):
+        return 300.0  # 5 minutes
+    return 600.0  # default 10 minutes
+
+
+def _build_cache_key(method: str, path: str, params: Optional[Dict[str, Any]], json_payload: Optional[Dict[str, Any]]) -> str:
+    """Create a deterministic cache key for a BookStack request."""
+
+    payload = {
+        "method": method.upper(),
+        "path": path,
+        "params": params or {},
+        "json": json_payload or {},
+    }
+    encoded = json.dumps(payload, sort_keys=True, default=str)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _invalidate_entity_cache(entity_type: str, entity_id: Optional[int] = None) -> None:
+    """Invalidate cached payloads for a given entity type."""
+
+    try:
+        bookstack_cache.invalidate_entity(entity_type, entity_id)
+    except Exception:
+        logger.warning(
+            "bookstack.cache_invalidation_failed",
+            extra={
+                "context": {
+                    "entity_type": entity_type,
+                    "entity_id": entity_id,
+                }
+            },
+        )
+
+
+def _validated_name(value: Optional[str], entity_type: EntityType) -> Optional[str]:
+    """Validate and sanitize entity names."""
+
+    if value is None:
+        return None
+    try:
+        return BookStackValidator.validate_entity_name(value, entity_type)
+    except ValidationError as exc:
+        raise _tool_error(
+            str(exc),
+            hint="Ensure the name is 1-500 characters without embedded scripts.",
+            context={"entity_type": entity_type, "value": value},
+        ) from exc
+
+
+def _validated_description(value: Optional[str], entity_type: EntityType) -> Optional[str]:
+    """Validate descriptions with generous length limits."""
+
+    if value is None:
+        return None
+    try:
+        return InputValidator.validate_string(
+            value,
+            f"{entity_type}_description",
+            min_length=1 if entity_type == "book" else None,
+            max_length=20_000,
+            allow_empty=entity_type != "book",
+        )
+    except ValidationError as exc:
+        raise _tool_error(
+            str(exc),
+            hint="Descriptions must be text up to 20k characters without scripts.",
+            context={"entity_type": entity_type},
+        ) from exc
+
+
+def _validated_markdown(value: Optional[str]) -> Optional[str]:
+    """Validate markdown content."""
+
+    if value is None:
+        return None
+    try:
+        return InputValidator.validate_markdown(value, "markdown")
+    except ValidationError as exc:
+        raise _tool_error(str(exc), hint="Review markdown content for unsafe HTML.") from exc
+
+
+def _validated_html(value: Optional[str]) -> Optional[str]:
+    """Sanitize HTML blocks before submission."""
+
+    if value is None:
+        return None
+    sanitized = InputValidator.sanitize_html(value, "html")
+    try:
+        return InputValidator.validate_string(
+            sanitized,
+            "html",
+            max_length=500_000,
+            allow_empty=True,
+            check_sql_injection=False,
+            check_path_traversal=False,
+        )
+    except ValidationError as exc:
+        raise _tool_error(str(exc), hint="Ensure HTML content is well-formed and safe.") from exc
 
 
 def _require_env(var: str) -> str:
@@ -625,6 +780,28 @@ def _optional_positive_int(value: Optional[Any], label: str) -> Optional[int]:
     return _validate_positive_int(value, label)
 
 
+def _normalise_optional_parent_id(value: Optional[Any]) -> Optional[Any]:
+    """Treat zero/blank id values as absent when targeting parent locations."""
+
+    if value is None:
+        return None
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped or stripped == "0":
+            return None
+        try:
+            numeric = int(stripped, 10)
+        except ValueError:
+            return stripped
+        return numeric
+    if isinstance(value, bool):
+        return 1 if value else None
+    if isinstance(value, (int, float)):
+        numeric = int(value)
+        return None if numeric == 0 else numeric
+    return value
+
+
 def _optional_non_negative_int(value: Optional[Any], label: str) -> Optional[int]:
     """Return a validated non-negative integer or None."""
     if value is None:
@@ -657,23 +834,25 @@ def _format_tags(tags: Optional[Sequence[TagDict]]) -> Optional[list[TagDict]]:
     """Return tags in the shape expected by BookStack, or None if absent."""
     if tags is None:
         return None
-
-    formatted: list[TagDict] = []
+    normalised: list[Dict[str, str]] = []
     for tag in tags:
-        name = tag.get("name") if isinstance(tag, dict) else getattr(tag, "name", None)
-        value = tag.get("value") if isinstance(tag, dict) else getattr(tag, "value", None)
-        if not name:
-            raise _tool_error(
-                "Tag entries require a non-empty 'name'",
-                hint="Each tag must specify both 'name' and 'value'.",
-            )
-        if value is None:
-            raise _tool_error(
-                "Tag entries require a 'value'",
-                hint="Each tag must specify both 'name' and 'value'.",
-            )
-        formatted.append({"name": str(name), "value": str(value)})
-    return formatted
+        if isinstance(tag, dict):
+            normalised.append({"name": str(tag.get("name", "")), "value": str(tag.get("value", ""))})
+        else:
+            name = getattr(tag, "name", "")
+            value = getattr(tag, "value", "")
+            normalised.append({"name": str(name), "value": str(value)})
+
+    try:
+        validated = BookStackValidator.validate_tags(normalised)
+    except ValidationError as exc:
+        raise _tool_error(
+            str(exc),
+            hint="Verify that each tag includes 'name' (1-100 chars) and optional 'value'.",
+            context={"tags": normalised},
+        ) from exc
+
+    return validated
 
 
 def _compact_payload(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -723,7 +902,31 @@ def _bookstack_request(
 ) -> Any:
     """Execute a JSON request against the BookStack API."""
 
+    method = method.upper()
+    cache_bucket = _select_cache_bucket(method, path)
+    cache_key: Optional[str] = None
+    if cache_bucket is not None:
+        cache_key = _build_cache_key(method, path, params, json)
+        cached_payload = cache_bucket.get(cache_key)
+        if cached_payload is not None:
+            logger.info(
+                "bookstack.cache_hit",
+                extra={
+                    "context": {
+                        "method": method,
+                        "path": path,
+                        "params": params,
+                    }
+                },
+            )
+            return cached_payload
+
     url = f"{_bookstack_base_url()}{path}"
+    collector = get_metrics_collector()
+    start_time = time.time()
+    status_code: int = 0
+    error_message: Optional[str] = None
+
     try:
         response = requests.request(
             method,
@@ -733,25 +936,23 @@ def _bookstack_request(
             json=json,
             timeout=60,
         )
+        status_code = response.status_code
         response.raise_for_status()
     except requests.HTTPError as exc:
-        import logging
-        logger = logging.getLogger(__name__)
-
         status = exc.response.status_code if exc.response is not None else "unknown"
+        status_code = status if isinstance(status, int) else 0
         preview: Optional[str] = None
         error_detail = ""
         if exc.response is not None:
             try:
                 preview = exc.response.text[:400]
-                logger.error(f"BookStack API error {status}: {preview}")
                 # Try to extract error message from JSON response
                 try:
                     error_json = exc.response.json()
                     if isinstance(error_json, dict):
-                        if 'error' in error_json:
+                        if "error" in error_json:
                             error_detail = f": {error_json['error']}"
-                        elif 'message' in error_json:
+                        elif "message" in error_json:
                             error_detail = f": {error_json['message']}"
                 except Exception:
                     pass
@@ -761,7 +962,10 @@ def _bookstack_request(
         # Provide specific hints for common HTTP errors
         hint = "Verify the BookStack credentials, entity identifiers, and payload fields."
         if status == 409:
-            hint = "Conflict error (409): This usually means a resource with the same name already exists, or there's a constraint violation. Check the response_preview for details."
+            hint = (
+                "Conflict error (409): This usually means a resource with the same name already exists, "
+                "or there's a constraint violation. Check the response_preview for details."
+            )
         elif status == 404:
             hint = "Not found (404): The entity ID or endpoint doesn't exist. Verify the ID is correct."
         elif status == 401:
@@ -769,10 +973,28 @@ def _bookstack_request(
         elif status == 403:
             hint = "Forbidden (403): Your API token doesn't have permission for this operation."
         elif status == 422:
-            hint = "Validation error (422): The request payload is invalid. Check the response_preview for field-specific errors."
+            hint = (
+                "Validation error (422): The request payload is invalid. "
+                "Check the response_preview for field-specific errors."
+            )
 
         error_msg = f"BookStack API request failed with HTTP {status}{error_detail}"
-        logger.error(f"{error_msg}\nHint: {hint}\nMethod: {method}, Path: {path}")
+        error_message = error_msg
+        logger.error(
+            "bookstack.api_error",
+            extra={
+                "context": {
+                    "message": error_msg,
+                    "hint": hint,
+                    "method": method,
+                    "path": path,
+                    "params": params,
+                    "payload": json,
+                    "status": status,
+                    "response_preview": preview,
+                }
+            },
+        )
 
         raise _tool_error(
             error_msg,
@@ -787,28 +1009,49 @@ def _bookstack_request(
             },
         ) from exc
     except requests.RequestException as exc:  # pragma: no cover - network failure path
+        error_message = str(exc)
+        logger.error(
+            "bookstack.transport_error",
+            extra={
+                "context": {
+                    "message": error_message,
+                    "method": method,
+                    "path": path,
+                    "params": params,
+                }
+            },
+        )
         raise _tool_error(
             "Unable to reach the BookStack API endpoint",
             hint="Check network connectivity and ensure the BS_URL host is reachable from the container.",
             context={"method": method, "path": path, "params": params},
         ) from exc
+    finally:
+        duration = time.time() - start_time
+        # Only record metrics when we actually contacted the API
+        collector.record_request(method, path, duration, status_code, error_message)
 
     if response.status_code == 204 or not response.content:
-        return {"success": True, "status": response.status_code}
+        payload: Any = {"success": True, "status": response.status_code}
+    else:
+        try:
+            payload = response.json()
+        except ValueError as exc:  # pragma: no cover - unexpected payload
+            raise _tool_error(
+                "BookStack API returned a non-JSON response",
+                hint="Inspect the response body to confirm the endpoint and authentication are correct.",
+                context={
+                    "method": method,
+                    "path": path,
+                    "status": response.status_code,
+                    "raw": response.text[:400],
+                },
+            ) from exc
 
-    try:
-        return response.json()
-    except ValueError as exc:  # pragma: no cover - unexpected payload
-        raise _tool_error(
-            "BookStack API returned a non-JSON response",
-            hint="Inspect the response body to confirm the endpoint and authentication are correct.",
-            context={
-                "method": method,
-                "path": path,
-                "status": response.status_code,
-                "raw": response.text[:400],
-            },
-        ) from exc
+    if cache_bucket is not None and cache_key is not None:
+        cache_bucket.set(cache_key, payload, ttl=_cache_ttl_for(path))
+
+    return payload
 
 
 def _bookstack_request_form(
@@ -1072,25 +1315,25 @@ def _build_list_cache_key(params: Dict[str, Any]) -> str:
             items.append((key, tuple(sorted(value.items()))))
         else:
             items.append((key, value))
-    return repr(items)
+    encoded = json.dumps(items, sort_keys=True, default=str)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 def _get_cached_list(cache_key: str) -> Optional[CacheEntry]:
-    entry = _LIST_CACHE.get(cache_key)
-    if not entry:
+    cached = bookstack_cache.images.get(cache_key)
+    if cached is None:
         return None
-    if time.time() - entry.timestamp > _LIST_CACHE_TTL_SECONDS:
-        _LIST_CACHE.pop(cache_key, None)
-        return None
-    return entry
+    if isinstance(cached, dict):
+        return CacheEntry(data=cached.get("data"), metadata=cached.get("metadata"))
+    return CacheEntry(data=cached)
 
 
 def _set_cached_list(cache_key: str, data: Any, metadata: Optional[Dict[str, Any]]) -> None:
-    _LIST_CACHE[cache_key] = CacheEntry(timestamp=time.time(), data=data, metadata=metadata)
+    bookstack_cache.images.set(cache_key, {"data": data, "metadata": metadata}, ttl=_cache_ttl_for("/api/image-gallery"))
 
 
 def _invalidate_list_cache() -> None:
-    _LIST_CACHE.clear()
+    bookstack_cache.images.invalidate()
 
 
 def _ensure_iso8601(value: str, label: str) -> datetime:
@@ -1142,12 +1385,12 @@ def _build_content_operation(
     if operation == "create":
         name_value = _normalise_str(payload.get("name")) or _normalise_str(name)
         _ensure(name_value is not None, "'name' is required when creating an entity")
-        payload["name"] = name_value
+        payload["name"] = _validated_name(name_value, entity_type)
 
         if entity_type == "book":
             description_value = _normalise_str(payload.get("description")) or _normalise_str(description)
             _ensure(description_value is not None, "'description' is required when creating a book")
-            payload["description"] = description_value
+            payload["description"] = _validated_description(description_value, entity_type)
             image_value = payload.get("image_id") if payload.get("image_id") is not None else image_id
             if image_value is not None:
                 payload["image_id"] = _validate_positive_int(image_value, "'image_id'")
@@ -1155,7 +1398,7 @@ def _build_content_operation(
         elif entity_type == "bookshelf":
             description_value = _normalise_str(description) or _normalise_str(payload.get("description"))
             if description_value is not None:
-                payload["description"] = description_value
+                payload["description"] = _validated_description(description_value, entity_type)
             shelf_books = books if books is not None else payload.get("books")
             normalised_books = _normalise_books(shelf_books)
             if normalised_books is not None:
@@ -1168,7 +1411,7 @@ def _build_content_operation(
             payload["book_id"] = _validate_positive_int(chapter_book_id, "'book_id'")
             description_value = _normalise_str(description) or _normalise_str(payload.get("description"))
             if description_value is not None:
-                payload["description"] = description_value
+                payload["description"] = _validated_description(description_value, entity_type)
             chapter_priority = priority if priority is not None else payload.get("priority")
             priority_value = _optional_non_negative_int(chapter_priority, "'priority'")
             if priority_value is not None:
@@ -1177,8 +1420,10 @@ def _build_content_operation(
                 payload.pop("priority", None)
 
         elif entity_type == "page":
-            page_book_id = payload.get("book_id") if payload.get("book_id") is not None else book_id
-            page_chapter_id = payload.get("chapter_id") if payload.get("chapter_id") is not None else chapter_id
+            raw_page_book_id = payload.get("book_id") if payload.get("book_id") is not None else book_id
+            raw_page_chapter_id = payload.get("chapter_id") if payload.get("chapter_id") is not None else chapter_id
+            page_book_id = _normalise_optional_parent_id(raw_page_book_id)
+            page_chapter_id = _normalise_optional_parent_id(raw_page_chapter_id)
             book_value = _optional_positive_int(page_book_id, "'book_id'")
             chapter_value = _optional_positive_int(page_chapter_id, "'chapter_id'")
             if book_value is None and chapter_value is None:
@@ -1206,9 +1451,9 @@ def _build_content_operation(
                 html_value = html
 
             if isinstance(markdown_value, str):
-                markdown_value = _normalise_str(markdown_value)
+                markdown_value = _validated_markdown(_normalise_str(markdown_value))
             if isinstance(html_value, str):
-                html_value = _normalise_str(html_value)
+                html_value = _validated_html(_normalise_str(html_value))
 
             if markdown_value and html_value:
                 raise _tool_error(
@@ -1250,9 +1495,9 @@ def _build_content_operation(
         )
 
         if name is not None:
-            payload["name"] = _normalise_str(name) or name
+            payload["name"] = _validated_name(_normalise_str(name) or name, entity_type)
         if description is not None:
-            payload["description"] = _normalise_str(description) or description
+            payload["description"] = _validated_description(_normalise_str(description) or description, entity_type)
 
         if entity_type == "book":
             image_value = image_id if image_id is not None else payload.get("image_id")
@@ -1276,13 +1521,15 @@ def _build_content_operation(
                 payload["priority"] = _optional_non_negative_int(chapter_priority, "'priority'")
 
         elif entity_type == "page":
-            page_book = book_id if book_id is not None else payload.get("book_id")
-            page_chapter = chapter_id if chapter_id is not None else payload.get("chapter_id")
+            raw_page_book = book_id if book_id is not None else payload.get("book_id")
+            raw_page_chapter = chapter_id if chapter_id is not None else payload.get("chapter_id")
+            page_book = _normalise_optional_parent_id(raw_page_book)
+            page_chapter = _normalise_optional_parent_id(raw_page_chapter)
             if page_book is not None:
                 payload["book_id"] = _validate_positive_int(page_book, "'book_id'")
             if page_chapter is not None:
                 payload["chapter_id"] = _validate_positive_int(page_chapter, "'chapter_id'")
-
+            
             markdown_value = payload.get("markdown")
             html_value = payload.get("html")
 
@@ -1294,9 +1541,9 @@ def _build_content_operation(
                 html_value = html
 
             if isinstance(markdown_value, str):
-                markdown_value = _normalise_str(markdown_value)
+                markdown_value = _validated_markdown(_normalise_str(markdown_value))
             if isinstance(html_value, str):
-                html_value = _normalise_str(html_value)
+                html_value = _validated_html(_normalise_str(html_value))
 
             if markdown_value and html_value:
                 raise _tool_error(
@@ -1395,9 +1642,113 @@ def _extract_summary(item: Dict[str, Any]) -> str:
     return "No summary available"
 
 
+def _coerce_int(value: Any) -> int:
+    try:
+        if value is None:
+            return 0
+        if isinstance(value, bool):
+            return int(value)
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return 0
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _coerce_float(value: Any) -> float:
+    try:
+        if value is None:
+            return 0.0
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _extract_candidate_chunks(result: Dict[str, Any]) -> list[Dict[str, Any]]:
+    chunks: list[Dict[str, Any]] = []
+    for key in ("results", "evidence", "data", "documents"):
+        value = result.get(key)
+        if isinstance(value, list):
+            chunks.extend(item for item in value if isinstance(item, dict))
+
+    nested = result.get("result")
+    if isinstance(nested, dict):
+        for key in ("results", "evidence", "data", "documents"):
+            value = nested.get(key)
+            if isinstance(value, list):
+                chunks.extend(item for item in value if isinstance(item, dict))
+
+    return chunks
+
+
+def _attach_entity_summary(result: Dict[str, Any]) -> Dict[str, Any]:
+    chunks = _extract_candidate_chunks(result)
+    if not chunks:
+        return result
+
+    by_page: Dict[int, Dict[str, Any]] = {}
+    for chunk in chunks:
+        source = chunk.get("source")
+        source_data = source if isinstance(source, dict) else {}
+
+        page_id = _coerce_int(chunk.get("bookstack_page_id") or source_data.get("bookstack_page_id"))
+        if page_id <= 0:
+            continue
+
+        score = _coerce_float(chunk.get("score") or source_data.get("score"))
+        book_id = _coerce_int(chunk.get("book_id") or source_data.get("book_id"))
+        chapter_id = _coerce_int(chunk.get("chapter_id") or source_data.get("chapter_id"))
+        name = _as_string(chunk.get("title") or chunk.get("name") or source_data.get("name")) or ""
+        book_name = _as_string(chunk.get("book_name") or source_data.get("book_name")) or ""
+
+        current = by_page.get(page_id)
+        if current is None:
+            by_page[page_id] = {
+                "page_id": page_id,
+                "book_id": book_id,
+                "chapter_id": chapter_id,
+                "name": name,
+                "book_name": book_name,
+                "best_score": score,
+                "chunks": 1,
+            }
+            continue
+
+        current["chunks"] = int(current["chunks"]) + 1
+        if score > _coerce_float(current.get("best_score")):
+            current["best_score"] = score
+        if not current.get("book_id") and book_id > 0:
+            current["book_id"] = book_id
+        if not current.get("chapter_id") and chapter_id > 0:
+            current["chapter_id"] = chapter_id
+        if not current.get("name") and name:
+            current["name"] = name
+        if not current.get("book_name") and book_name:
+            current["book_name"] = book_name
+
+    if not by_page:
+        return result
+
+    entities = sorted(
+        by_page.values(),
+        key=lambda item: (_coerce_float(item.get("best_score")), _coerce_int(item.get("chunks"))),
+        reverse=True,
+    )
+    result["entities"] = entities
+    return result
+
+
 def register_bookstack_tools(mcp: FastMCP) -> None:
     """Register BookStack tools on the provided FastMCP instance."""
 
+    @track_tool("bookstack_manage_content")
+    @track_tool("bookstack_list_content")
+    @track_tool("bookstack_search")
+    @track_tool("bookstack_semantic_search")
+    @track_tool("bookstack_manage_images")
+    @track_tool("bookstack_search_images")
     @mcp.tool(
         annotations={
             "title": "Manage BookStack Content",
@@ -1477,9 +1828,17 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
     ) -> Dict[str, Any]:
         """Perform CRUD operations against BookStack content entities."""
 
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"bookstack_manage_content called: operation={operation}, entity_type={entity_type}, id={id}")
+        collector = get_metrics_collector()
+        logger.info(
+            "bookstack.manage_content",
+            extra={
+                "context": {
+                    "operation": operation,
+                    "entity_type": entity_type,
+                    "entity_id": id,
+                }
+            },
+        )
 
         prepared = _build_content_operation(
             operation,
@@ -1537,6 +1896,10 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
                 result["id"] = id
             elif isinstance(response, dict) and isinstance(response.get("id"), int):
                 result["id"] = response["id"]
+            if operation in {"create", "update", "delete"}:
+                result_id = result.get("id")
+                _invalidate_entity_cache(entity_type, result_id if isinstance(result_id, int) else None)
+                collector.record_entity_operation(entity_type, operation)
             return result
 
         response = _bookstack_request(
@@ -1556,6 +1919,10 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
             result["id"] = id
         elif isinstance(response, dict) and isinstance(response.get("id"), int):
             result["id"] = response["id"]
+        if operation in {"create", "update", "delete"}:
+            result_id = result.get("id")
+            _invalidate_entity_cache(entity_type, result_id if isinstance(result_id, int) else None)
+            collector.record_entity_operation(entity_type, operation)
         return result
 
     @mcp.tool(
@@ -1603,6 +1970,18 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
         ] = None,
     ) -> Dict[str, Any]:
         """Return a paginated listing of BookStack entities."""
+
+        logger.info(
+            "bookstack.list_content",
+            extra={
+                "context": {
+                    "entity_type": entity_type,
+                    "offset": offset,
+                    "count": count,
+                    "filters": filters,
+                }
+            },
+        )
 
         base_path = _LIST_BASE_PATHS[entity_type]
 
@@ -1752,6 +2131,27 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
     ) -> Dict[str, Any]:
         """Search across BookStack content."""
 
+        logger.info(
+            "bookstack.search",
+            extra={
+                "context": {
+                    "query": query,
+                    "page": page,
+                    "count": count,
+                }
+            },
+        )
+
+        try:
+            query = InputValidator.validate_string(
+                query,
+                "query",
+                min_length=1,
+                max_length=500,
+            )
+        except ValidationError as exc:
+            raise _tool_error(str(exc), context={"field": "query"}) from exc
+
         params: Dict[str, Any] = {"query": query}
         if page is not None:
             params["page"] = page
@@ -1880,11 +2280,33 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
     ) -> Dict[str, Any]:
         """Unified CRUD interface for BookStack image gallery."""
 
+        collector = get_metrics_collector()
+        logger.info(
+            "bookstack.manage_images",
+            extra={
+                "context": {
+                    "operation": operation,
+                    "image_id": id,
+                    "uploaded_to": uploaded_to,
+                }
+            },
+        )
+
         if operation in {"read", "delete", "update"}:
             _ensure(id is not None, "'id' is required for read/update/delete operations")
         target_page_id = None if uploaded_to is None else _validate_positive_int(uploaded_to, "'uploaded_to'")
 
         if operation == "create":
+            if name is not None:
+                try:
+                    name = InputValidator.validate_string(
+                        name,
+                        "image_name",
+                        min_length=1,
+                        max_length=255,
+                    )
+                except ValidationError as exc:
+                    raise _tool_error(str(exc), context={"field": "name"}) from exc
             _ensure(bool(name), "'name' is required when creating an image")
             _ensure(bool(image), "Provide an image payload for create operations")
             _ensure(
@@ -1906,7 +2328,8 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
                 data=payload,
                 files=files,
             )
-            _invalidate_list_cache()
+            bookstack_cache.images.invalidate()
+            collector.record_entity_operation("image", operation)
             return {"operation": operation, "success": True, "data": response}
 
         if operation == "read":
@@ -1919,6 +2342,15 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
             data_payload: Dict[str, Any] = {}
             files_payload: Dict[str, Tuple[str, bytes, str]] = {}
             if new_name:
+                try:
+                    new_name = InputValidator.validate_string(
+                        new_name,
+                        "new_image_name",
+                        min_length=1,
+                        max_length=255,
+                    )
+                except ValidationError as exc:
+                    raise _tool_error(str(exc), context={"field": "new_name"}) from exc
                 data_payload["name"] = new_name
             if new_image:
                 prepared = _prepare_image_payload(new_image, new_name or f"image-{id}")
@@ -1929,12 +2361,14 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
                 data=data_payload or None,
                 files=files_payload or None,
             )
-            _invalidate_list_cache()
+            bookstack_cache.images.invalidate()
+            collector.record_entity_operation("image", operation)
             return {"operation": operation, "success": True, "data": response}
 
         if operation == "delete":
             response = _bookstack_request("DELETE", f"/api/image-gallery/{id}")
-            _invalidate_list_cache()
+            bookstack_cache.images.invalidate()
+            collector.record_entity_operation("image", operation)
             return {"operation": operation, "success": True, "data": response}
 
         # operation == "list"
@@ -1949,27 +2383,27 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
                 query[f"filter[{key}]"] = value
 
         cache_key = _build_list_cache_key(query)
-        cached = _get_cached_list(cache_key)
-        if cached:
-            metadata = dict(cached.metadata or {})
-            metadata["cached"] = True
+        cached_entry = _get_cached_list(cache_key)
+        if cached_entry is not None:
+            cached_metadata = dict(cached_entry.metadata or {})
+            cached_metadata["cached"] = True
             return {
                 "operation": operation,
                 "success": True,
-                "data": cached.data,
-                "metadata": metadata,
+                "data": cached_entry.data,
+                "metadata": cached_metadata,
             }
 
         response = _bookstack_request("GET", "/api/image-gallery", params=query)
         data, metadata = _normalize_image_list_response(response, offset=resolved_offset, count=resolved_count)
         _set_cached_list(cache_key, data, metadata)
+        result_metadata = dict(metadata) if metadata else {}
         result: Dict[str, Any] = {
             "operation": operation,
             "success": True,
             "data": data,
+            "metadata": result_metadata,
         }
-        if metadata:
-            result["metadata"] = metadata
         return result
 
     @mcp.tool(
@@ -2025,6 +2459,29 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
         ] = None,
     ) -> Dict[str, Any]:
         """Advanced discovery tool for BookStack image gallery."""
+
+        logger.info(
+            "bookstack.search_images",
+            extra={
+                "context": {
+                    "query": query,
+                    "extension": extension,
+                    "used_in": used_in,
+                }
+            },
+        )
+
+        if query:
+            try:
+                query = InputValidator.validate_string(
+                    query,
+                    "image_query",
+                    min_length=1,
+                    max_length=255,
+                    allow_empty=False,
+                )
+            except ValidationError as exc:
+                raise _tool_error(str(exc), context={"field": "query"}) from exc
 
         if size_min is not None and size_max is not None and size_min > size_max:
             raise _tool_error(
@@ -2090,9 +2547,10 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
             payload["sort"] = sort
         return payload
 
+    @track_tool("bookstack_batch_operations")
     @mcp.tool(
         annotations={
-            "title": "Batch Content Operations",
+            "title": "BookStack Batch Operations",
         }
     )
     def bookstack_batch_operations(
@@ -2126,6 +2584,19 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
         total = len(items)
         successes: list[Dict[str, Any]] = []
         errors: list[Dict[str, Any]] = []
+
+        collector = get_metrics_collector()
+        logger.info(
+            "bookstack.batch_operations",
+            extra={
+                "context": {
+                    "operation": operation,
+                    "entity_type": entity_type,
+                    "item_count": total,
+                    "dry_run": dry_run,
+                }
+            },
+        )
 
         def build_prepared(item: Dict[str, Any]) -> PreparedOperation:
             item_id = item.get("id")
@@ -2222,6 +2693,18 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
                             "result": response,
                         }
                     )
+                    logical_op = (
+                        "create" if operation == "bulk_create"
+                        else "update" if operation == "bulk_update"
+                        else "delete"
+                    )
+                    cache_target = None
+                    if logical_op == "create" and isinstance(response, dict) and isinstance(response.get("id"), int):
+                        cache_target = response["id"]
+                    elif logical_op in {"update", "delete"} and isinstance(item.get("id"), int):
+                        cache_target = item["id"]
+                    _invalidate_entity_cache(entity_type, cache_target)
+                    collector.record_entity_operation(entity_type, logical_op)
                 except ToolError as exc:
                     errors.append({"index": item_index, "error": str(exc)})
                     if not continue_on_error:
@@ -2245,3 +2728,331 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
             "results": successes,
             "errors": errors,
         }
+
+    @track_tool("bookstack_get_metrics")
+    @mcp.tool(
+        annotations={
+            "title": "Get Server Metrics",
+            "readOnlyHint": True,
+        }
+    )
+    def bookstack_get_metrics() -> Dict[str, Any]:
+        """Expose runtime metrics for the BookStack MCP server."""
+
+        collector = get_metrics_collector()
+        logger.info("bookstack.metrics_report")
+
+        return {
+            "summary": collector.get_summary(),
+            "tools": collector.get_tool_metrics(),
+            "entities": collector.get_entity_metrics(),
+            "cache": bookstack_cache.get_all_stats(),
+            "recent_errors": collector.get_recent_errors(limit=10),
+            "slow_requests": collector.get_slow_requests(limit=10),
+            "top_endpoints": collector.get_top_endpoints(limit=10),
+        }
+
+    @track_tool("bookstack_health_check")
+    @mcp.tool(
+        annotations={
+            "title": "BookStack Health Check",
+            "readOnlyHint": True,
+        }
+    )
+    def bookstack_health_check() -> Dict[str, Any]:
+        """Return health information for the MCP server and BookStack API."""
+
+        collector = get_metrics_collector()
+        start_time = time.time()
+        api_healthy = True
+        api_error: Optional[str] = None
+
+        # Ensure the next request bypasses cache so we measure real latency
+        bookstack_cache.books.invalidate()
+        try:
+            _bookstack_request("GET", "/api/books", params={"count": 1})
+        except ToolError as exc:
+            api_healthy = False
+            api_error = str(exc)
+        except Exception as exc:  # pragma: no cover - defensive guard
+            api_healthy = False
+            api_error = str(exc)
+
+        latency_ms = (time.time() - start_time) * 1000 if api_healthy else None
+        summary = collector.get_summary()
+        cache_stats = bookstack_cache.get_all_stats()
+
+        payload: Dict[str, Any] = {
+            "status": "healthy" if api_healthy else "degraded",
+            "bookstack_api": {
+                "healthy": api_healthy,
+                "latency_ms": f"{latency_ms:.2f}" if latency_ms is not None else None,
+                "error": api_error,
+            },
+            "server": {
+                "uptime": summary.get("uptime_formatted"),
+                "total_requests": summary.get("total_requests"),
+                "error_rate": summary.get("error_rate"),
+            },
+            "cache": cache_stats,
+        }
+        return payload
+
+    @track_tool("bookstack_semantic_search")
+    @mcp.tool(
+        annotations={
+            "title": "Semantic Search BookStack",
+            "readOnlyHint": True,
+        }
+    )
+    def bookstack_semantic_search(
+        query: Annotated[
+            str,
+            Field(min_length=1, description="Search query for semantic/hybrid search across BookStack documents."),
+        ],
+        top_k: Annotated[
+            Optional[int],
+            WithJsonSchema({**copy.deepcopy(_OPTIONAL_INT_SCHEMA), "description": "Maximum number of document chunks to return (default: 5)."}),
+        ] = None,
+        response_mode: Annotated[
+            Optional[str],
+            Field(default=None, description="Response mode: 'synthesis' (default), 'raw', or 'both'."),
+        ] = None,
+        book_filter: Annotated[
+            Optional[str],
+            Field(default=None, description="Filter results by book name."),
+        ] = None,
+        score_threshold: Annotated[
+            Optional[float],
+            Field(default=None, description="Minimum confidence score threshold (0.0-1.0, default: 0.3)."),
+        ] = None,
+    ) -> Dict[str, Any]:
+        """Perform semantic/hybrid search across BookStack wiki content using Hayhooks."""
+
+        logger.info(
+            "bookstack.semantic_search",
+            extra={
+                "context": {
+                    "query": query,
+                    "top_k": top_k,
+                    "response_mode": response_mode,
+                    "book_filter": book_filter,
+                    "score_threshold": score_threshold,
+                }
+            },
+        )
+
+        try:
+            query = InputValidator.validate_string(
+                query,
+                "query",
+                min_length=1,
+                max_length=500,
+            )
+        except ValidationError as exc:
+            raise _tool_error(str(exc), context={"field": "query"}) from exc
+
+        # Build request payload for Hayhooks
+        payload: Dict[str, Any] = {
+            "query": query,
+        }
+
+        # Add optional parameters
+        if top_k is not None:
+            try:
+                payload["top_k"] = _validate_positive_int(top_k, "top_k")
+            except ToolError:
+                payload["top_k"] = 5  # fallback to default
+        else:
+            payload["top_k"] = 5
+
+        if response_mode is not None:
+            mode = str(response_mode).strip().lower()
+            if mode in ("synthesis", "raw", "both"):
+                payload["response_mode"] = mode
+            else:
+                payload["response_mode"] = "synthesis"
+        else:
+            payload["response_mode"] = "synthesis"
+
+        if score_threshold is not None:
+            try:
+                threshold = float(score_threshold)
+                if 0.0 <= threshold <= 1.0:
+                    payload["score_threshold"] = threshold
+                else:
+                    payload["score_threshold"] = 0.3
+            except (TypeError, ValueError):
+                payload["score_threshold"] = 0.3
+        else:
+            payload["score_threshold"] = 0.3
+
+        # Add book filter if provided (maps to filename_filter in Hayhooks)
+        if book_filter is not None:
+            book_filter_str = _normalise_str(book_filter)
+            if book_filter_str:
+                payload["filename_filter"] = book_filter_str
+
+        # Get Hayhooks endpoint URL from environment
+        hayhooks_url = os.environ.get(
+            "HAYHOOKS_SEARCH_URL",
+            "http://192.168.50.90:1416/search_documents/run"
+        ).rstrip("/")
+
+        try:
+            response = requests.post(
+                hayhooks_url,
+                json=payload,
+                timeout=60,
+                headers={"Content-Type": "application/json"},
+            )
+            response.raise_for_status()
+        except requests.exceptions.Timeout as exc:
+            raise _tool_error(
+                "Hayhooks semantic search request timed out",
+                hint="The search service may be slow or unreachable. Try again later.",
+                context={"url": hayhooks_url, "query": query},
+            ) from exc
+        except requests.exceptions.ConnectionError as exc:
+            raise _tool_error(
+                "Failed to connect to Hayhooks search service",
+                hint="Check that HAYHOOKS_SEARCH_URL is set correctly and the service is running.",
+                context={"url": hayhooks_url},
+            ) from exc
+        except requests.exceptions.HTTPError as exc:
+            status = exc.response.status_code if exc.response else "unknown"
+            preview = None
+            if exc.response is not None:
+                try:
+                    preview = exc.response.text[:400]
+                except Exception:
+                    pass
+            raise _tool_error(
+                f"Hayhooks search failed with HTTP {status}",
+                hint="Verify the search query and Hayhooks configuration.",
+                context={
+                    "url": hayhooks_url,
+                    "status": status,
+                    "response_preview": preview,
+                },
+            ) from exc
+        except requests.exceptions.RequestException as exc:
+            raise _tool_error(
+                "Hayhooks search request failed",
+                hint="Check network connectivity and Hayhooks service status.",
+                context={"url": hayhooks_url, "error": str(exc)},
+            ) from exc
+
+        # Parse and return the response
+        try:
+            result = response.json()
+        except ValueError as exc:
+            raise _tool_error(
+                "Hayhooks returned a non-JSON response",
+                hint="Verify the Hayhooks service is functioning correctly.",
+                context={"url": hayhooks_url, "raw": response.text[:400]},
+            ) from exc
+
+        # Ensure we return a dict with success indicator
+        if isinstance(result, dict):
+            result = _attach_entity_summary(result)
+            if "success" not in result:
+                result["success"] = True
+            return result
+        else:
+            return {"success": True, "data": result}
+
+    @track_tool("bookstack_dashboard")
+    @mcp.tool(
+        annotations={
+            "title": "BookStack Metrics Dashboard",
+            "readOnlyHint": True,
+        }
+    )
+    def bookstack_dashboard() -> str:
+        """Produce a human-friendly dashboard summarizing server status."""
+
+        collector = get_metrics_collector()
+        summary = collector.get_summary()
+        tools = collector.get_tool_metrics()
+        cache_stats = bookstack_cache.get_all_stats()
+
+        sorted_tools = sorted(
+            tools.items(),
+            key=lambda item: item[1].get("call_count", 0),
+            reverse=True,
+        )[:5]
+
+        lines = [
+            "╔══════════════════════════════════════════════════════════════╗",
+            "║           BookStack MCP Server - Dashboard                   ║",
+            "╚══════════════════════════════════════════════════════════════╝",
+            "",
+            "📊 Server Status",
+            f"  Uptime:              {summary.get('uptime_formatted')}",
+            f"  Total Requests:      {summary.get('total_requests')}",
+            f"  Requests/sec:        {summary.get('requests_per_second')}",
+            f"  Avg Duration:        {summary.get('avg_duration_ms')} ms",
+            f"  Error Rate:          {summary.get('error_rate')}",
+            "",
+            "🔧 Top Tools",
+        ]
+
+        if sorted_tools:
+            for tool_name, metrics_info in sorted_tools:
+                lines.extend(
+                    [
+                        f"  {tool_name}",
+                        f"    Calls:             {metrics_info.get('call_count')}",
+                        f"    Success Rate:      {metrics_info.get('success_rate')}",
+                        f"    Avg Duration:      {metrics_info.get('avg_duration_ms')} ms",
+                    ]
+                )
+        else:
+            lines.append("  No tool invocations recorded yet.")
+
+        lines.extend(
+            [
+                "",
+                "💾 Cache Performance",
+                f"  Books Hit Rate:      {cache_stats['books'].get('hit_rate')}",
+                f"  Pages Hit Rate:      {cache_stats['pages'].get('hit_rate')}",
+                f"  Images Hit Rate:     {cache_stats['images'].get('hit_rate')}",
+                f"  Search Hit Rate:     {cache_stats['search'].get('hit_rate')}",
+                "",
+                f"⚠️  Recent Errors:      {len(collector.get_recent_errors(limit=5))}",
+                f"🐌 Slow Requests:       {summary.get('slow_requests_count')}",
+            ]
+        )
+
+        return "\n".join(lines)
+
+    @mcp.resource(
+        "resource://bookstack/books/{book_id}",
+        title="BookStack Book",
+        description="Retrieve a BookStack book with its contents for contextual grounding.",
+        mime_type="application/json",
+        annotations={"readOnlyHint": True},
+    )
+    def bookstack_book_resource(book_id: int) -> Dict[str, Any]:
+        safe_book_id = BookStackValidator.validate_entity_id(book_id, "book")
+        logger.info(
+            "bookstack.resource.book",
+            extra={"context": {"book_id": safe_book_id}},
+        )
+        return _bookstack_request("GET", f"/api/books/{safe_book_id}")
+
+    @mcp.resource(
+        "resource://bookstack/pages/{page_id}",
+        title="BookStack Page",
+        description="Retrieve a BookStack page for use as MCP resource content.",
+        mime_type="application/json",
+        annotations={"readOnlyHint": True},
+    )
+    def bookstack_page_resource(page_id: int) -> Dict[str, Any]:
+        safe_page_id = BookStackValidator.validate_entity_id(page_id, "page")
+        logger.info(
+            "bookstack.resource.page",
+            extra={"context": {"page_id": safe_page_id}},
+        )
+        return _bookstack_request("GET", f"/api/pages/{safe_page_id}")

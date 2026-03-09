@@ -128,3 +128,59 @@ async def test_image_search_rejects_invalid_ranges(monkeypatch: MonkeyPatch) -> 
             await tool.run({"size_min": 200, "size_max": 100})
 
     assert "size_min cannot be greater" in str(exc.value)
+
+
+def test_attach_entity_summary_deduplicates_page_ids() -> None:
+    payload = {
+        "results": [
+            {
+                "chunk_id": "a",
+                "score": 0.44,
+                "bookstack_page_id": 12,
+                "book_id": 3,
+                "chapter_id": 8,
+                "name": "Architecture",
+                "book_name": "Infra",
+            },
+            {
+                "chunk_id": "b",
+                "score": 0.91,
+                "bookstack_page_id": 12,
+                "book_id": 3,
+                "chapter_id": 8,
+                "name": "Architecture",
+                "book_name": "Infra",
+            },
+            {
+                "chunk_id": "c",
+                "score": 0.67,
+                "bookstack_page_id": 42,
+                "book_id": 7,
+                "chapter_id": 0,
+                "name": "Operations",
+                "book_name": "Runbooks",
+            },
+        ]
+    }
+
+    result = tools._attach_entity_summary(payload)
+    entities = result.get("entities")
+    assert isinstance(entities, list)
+    assert len(entities) == 2
+
+    first = entities[0]
+    assert first["page_id"] == 12
+    assert first["chunks"] == 2
+    assert first["best_score"] == 0.91
+
+
+def test_attach_entity_summary_ignores_missing_page_ids() -> None:
+    payload = {
+        "results": [
+            {"score": 0.9, "name": "No page id"},
+            {"score": 0.8, "bookstack_page_id": 0, "name": "Zero page id"},
+        ]
+    }
+
+    result = tools._attach_entity_summary(payload)
+    assert "entities" not in result

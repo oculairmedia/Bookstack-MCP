@@ -33,7 +33,7 @@ register_selective_bookstack_tools(mcp)
 print("Registering simplified tools (replacing complex versions)...")
 register_simplified_bookstack_tools(mcp)
 
-print("✅ Registered 6 tools: manage_content, batch_operations, list, search, manage_images, search_images")
+print("✅ Registered 7 tools: manage_content, batch_operations, list, search, semantic_search, manage_images, search_images")
 
 
 if __name__ == "__main__":

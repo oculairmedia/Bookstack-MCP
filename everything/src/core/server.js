@@ -25,7 +25,7 @@ export class BookstackServer {
         this.server.onerror = (error) => console.error('[MCP Error]', error);
 
         // Initialize API configuration
-        this.baseUrl = process.env.BS_URL || 'https://knowledge.oculair.ca';
+        this.baseUrl = process.env.BS_URL || 'http://192.168.50.80:8087';
         this.tokenId = process.env.BS_TOKEN_ID;
         this.tokenSecret = process.env.BS_TOKEN_SECRET;
         

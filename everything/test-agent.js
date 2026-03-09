@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 // Configuration
-const LETTA_BASE_URL = 'https://letta2.oculair.ca/v1';
+const LETTA_BASE_URL = 'http://192.168.50.90:8289/v1';
 const LETTA_PASSWORD = 'lettaSecurePass123';
 const AGENT_ID = 'agent-ce9c436e-cefe-4244-9554-8640d54427c7';
 

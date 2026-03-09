@@ -53,7 +53,7 @@ def create_bookshelf(name: str, description: str = None, books: list = None, tag
     if not name:
         return json.dumps({"error": "Bookshelf name is required"})
 
-    base_url = os.environ.get("BS_URL", "https://knowledge.oculair.ca").rstrip("/")
+    base_url = os.environ.get("BS_URL", "http://192.168.50.80:8087").rstrip("/")
     token_id = os.environ.get("BS_TOKEN_ID")
     token_secret = os.environ.get("BS_TOKEN_SECRET")
 
@@ -104,7 +104,7 @@ if __name__ == "__main__":
     print("Testing create_bookshelf tool...")
     
     # Set up environment with credentials
-    os.environ["BS_URL"] = "https://knowledge.oculair.ca"
+    os.environ["BS_URL"] = "http://192.168.50.80:8087"
     os.environ["BS_TOKEN_ID"] = "POnHR9Lbvm73T2IOcyRSeAqpA8bSGdMT"
     os.environ["BS_TOKEN_SECRET"] = "735wM5dScfUkcOy7qcrgqQ1eC5fBF7IE"
     

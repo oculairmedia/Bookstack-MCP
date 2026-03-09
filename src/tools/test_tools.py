@@ -24,7 +24,7 @@ from delete_bookshelf import delete_bookshelf
 
 def setup_environment():
     """Set up the environment variables for testing."""
-    os.environ["BS_URL"] = "https://knowledge.oculair.ca"
+    os.environ["BS_URL"] = "http://192.168.50.80:8087"
     os.environ["BS_TOKEN_ID"] = "POnHR9Lbvm73T2IOcyRSeAqpA8bSGdMT"
     os.environ["BS_TOKEN_SECRET"] = "735wM5dScfUkcOy7qcrgqQ1eC5fBF7IE"
 

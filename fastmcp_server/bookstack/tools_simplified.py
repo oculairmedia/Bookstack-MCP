@@ -21,6 +21,7 @@ from .tools import (
     _prepare_form_data,
     _prepare_image_payload,
     _validate_positive_int,
+    logger,
     EntityType,
     OperationType,
     BatchOperationType,
@@ -97,6 +98,100 @@ _SIMPLE_BATCH_ITEMS_SCHEMA: Dict[str, Any] = {
     "items": copy.deepcopy(_SIMPLE_BATCH_ITEM_SCHEMA),
 }
 
+_SIMPLIFIED_KNOWN_FIELDS = (
+    "name",
+    "description",
+    "content",
+    "markdown",
+    "html",
+    "cover_image",
+    "book_id",
+    "chapter_id",
+    "books",
+    "tags",
+    "image_id",
+    "priority",
+)
+
+_ID_FIELD_NAMES = {"book_id", "chapter_id", "image_id"}
+
+
+def _normalise_optional_id_value(value: Optional[Any]) -> Optional[Any]:
+    """Treat empty/zero identifiers as absent while preserving positive inputs."""
+
+    if value is None:
+        return None
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            numeric = int(stripped, 10)
+        except ValueError:
+            return stripped
+        return None if numeric == 0 else numeric
+    if isinstance(value, bool):
+        return 1 if value else None
+    if isinstance(value, (int, float)):
+        numeric = int(value)
+        return None if numeric == 0 else numeric
+    return value
+
+
+def _normalise_priority_value(value: Optional[Any]) -> Optional[Any]:
+    """Return a normalised priority when provided, otherwise None."""
+
+    if value is None:
+        return None
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            return int(stripped, 10)
+        except ValueError:
+            return stripped
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return int(value)
+    return value
+
+
+def _prepare_simplified_fields(
+    parsed_data: Optional[Any],
+    overrides: Dict[str, Optional[Any]],
+) -> tuple[Dict[str, Optional[Any]], Optional[Dict[str, Any]]]:
+    """Merge simplified overrides with parsed payload while normalising values."""
+
+    extracted: Dict[str, Any] = {}
+    updates: Dict[str, Any] = {}
+
+    if isinstance(parsed_data, dict):
+        extracted = _extract_known_fields(parsed_data)
+        updates = copy.deepcopy(parsed_data)
+
+    merged: Dict[str, Optional[Any]] = {}
+    for field in _SIMPLIFIED_KNOWN_FIELDS:
+        candidate = overrides.get(field)
+        if candidate is None:
+            candidate = extracted.get(field)
+        if field in _ID_FIELD_NAMES:
+            candidate = _normalise_optional_id_value(candidate)
+        elif field == "priority":
+            candidate = _normalise_priority_value(candidate)
+        merged[field] = candidate
+        if updates:
+            if candidate is None:
+                updates.pop(field, None)
+            else:
+                updates[field] = candidate
+
+    if not updates:
+        return merged, None
+
+    return merged, updates
+
 
 def register_simplified_bookstack_tools(mcp: FastMCP) -> None:
     """Register simplified BookStack tools with reduced schema complexity."""
@@ -125,10 +220,16 @@ def register_simplified_bookstack_tools(mcp: FastMCP) -> None:
             data: Additional fields as JSON string (e.g. '{"content":"...","book_id":1}')
             request_heartbeat: Ignored (for MCP client compatibility)
         """
-        import logging
         import json as json_module
-        logger = logging.getLogger(__name__)
-        logger.info(f"bookstack_content_crud CALLED: action={action}, content_id={content_id}")
+        logger.info(
+            "bookstack_simplified.content_crud",
+            extra={
+                "context": {
+                    "action": action,
+                    "content_id": content_id,
+                }
+            },
+        )
 
         # Parse action into operation and entity_type
         parts = action.split("_", 1)
@@ -137,35 +238,30 @@ def register_simplified_bookstack_tools(mcp: FastMCP) -> None:
         entity_type = entity_map.get(parts[1], parts[1])
 
         try:
-            # Parse data if it's a JSON string
             parsed_data = _coerce_json_object(data, label="data") if data else {}
-
-            # Merge simple params with data
-            kwargs = {
+            overrides = {
                 "name": name,
                 "description": description,
             }
-
-            # Extract known fields from data
-            if isinstance(parsed_data, dict):
-                kwargs.update(_extract_known_fields(parsed_data))
-                kwargs["updates"] = parsed_data
+            simplified_fields, clean_updates = _prepare_simplified_fields(parsed_data, overrides)
 
             prepared = _build_content_operation(
                 operation,
                 entity_type,
                 entity_id=content_id,
-                content=None,
-                markdown=None,
-                html=None,
-                cover_image=None,
-                book_id=None,
-                chapter_id=None,
-                books=None,
-                tags=None,
-                image_id=None,
-                priority=None,
-                **kwargs  # This will override None values with actual data
+                name=simplified_fields["name"],
+                description=simplified_fields["description"],
+                content=simplified_fields["content"],
+                markdown=simplified_fields["markdown"],
+                html=simplified_fields["html"],
+                cover_image=simplified_fields["cover_image"],
+                updates=clean_updates,
+                book_id=simplified_fields["book_id"],
+                chapter_id=simplified_fields["chapter_id"],
+                books=simplified_fields["books"],
+                tags=simplified_fields["tags"],
+                image_id=simplified_fields["image_id"],
+                priority=simplified_fields["priority"],
             )
 
             response = _bookstack_request(
@@ -174,6 +270,16 @@ def register_simplified_bookstack_tools(mcp: FastMCP) -> None:
                 params=prepared.params,
                 json=prepared.json,
             )
+        except TypeError as exc:
+            message = str(exc)
+            if "multiple values for keyword argument" in message:
+                duplicated = message.split("'")[-2] if "'" in message else "field"
+                logger.error(message, exc_info=True)
+                raise ToolError(
+                    f"Duplicate '{duplicated}' detected. Provide each field either via top-level parameters or inside 'data', not both."
+                ) from exc
+            logger.error(message, exc_info=True)
+            raise
         except Exception as e:
             logger.error(f"Error in bookstack_content_crud: {e}", exc_info=True)
             return {
@@ -271,9 +377,17 @@ def register_simplified_bookstack_tools(mcp: FastMCP) -> None:
         - id: Entity ID (required for update/delete)
         - data: Object or JSON string with entity fields
         """
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"bookstack_batch_operations_simple: operation={operation}, entity_type={entity_type}, items={len(items)}")
+        logger.info(
+            "bookstack_simplified.batch_operations",
+            extra={
+                "context": {
+                    "operation": operation,
+                    "entity_type": entity_type,
+                    "items": len(items),
+                    "dry_run": dry_run,
+                }
+            },
+        )
 
         total = len(items)
         successes: list[Dict[str, Any]] = []
@@ -282,15 +396,27 @@ def register_simplified_bookstack_tools(mcp: FastMCP) -> None:
         def build_prepared(item: Dict[str, Any]) -> PreparedOperation:
             item_id = item.get("id")
             data = _coerce_json_object(item.get("data"), label="batch item 'data'")
-            kwargs = _extract_known_fields(data) if isinstance(data, dict) else {}
-            kwargs["updates"] = data
-            
+            overrides: Dict[str, Optional[Any]] = {}
+            simplified_fields, clean_updates = _prepare_simplified_fields(data, overrides)
+
             if operation == "bulk_create":
                 return _build_content_operation(
                     "create",
                     entity_type,
                     entity_id=None,
-                    **kwargs
+                    name=simplified_fields["name"],
+                    description=simplified_fields["description"],
+                    content=simplified_fields["content"],
+                    markdown=simplified_fields["markdown"],
+                    html=simplified_fields["html"],
+                    cover_image=simplified_fields["cover_image"],
+                    updates=clean_updates,
+                    book_id=simplified_fields["book_id"],
+                    chapter_id=simplified_fields["chapter_id"],
+                    books=simplified_fields["books"],
+                    tags=simplified_fields["tags"],
+                    image_id=simplified_fields["image_id"],
+                    priority=simplified_fields["priority"],
                 )
             if operation == "bulk_update":
                 _ensure(item_id is not None, "Each update item requires an 'id'")
@@ -298,7 +424,19 @@ def register_simplified_bookstack_tools(mcp: FastMCP) -> None:
                     "update",
                     entity_type,
                     entity_id=_validate_positive_int(item_id, "'id'"),
-                    **kwargs
+                    name=simplified_fields["name"],
+                    description=simplified_fields["description"],
+                    content=simplified_fields["content"],
+                    markdown=simplified_fields["markdown"],
+                    html=simplified_fields["html"],
+                    cover_image=simplified_fields["cover_image"],
+                    updates=clean_updates,
+                    book_id=simplified_fields["book_id"],
+                    chapter_id=simplified_fields["chapter_id"],
+                    books=simplified_fields["books"],
+                    tags=simplified_fields["tags"],
+                    image_id=simplified_fields["image_id"],
+                    priority=simplified_fields["priority"],
                 )
             # bulk_delete
             _ensure(item_id is not None, "Each delete item requires an 'id'")
@@ -334,6 +472,21 @@ def register_simplified_bookstack_tools(mcp: FastMCP) -> None:
                     "index": item_index,
                     "result": response,
                 })
+            except TypeError as exc:
+                message = str(exc)
+                if "missing" in message and "required keyword-only arguments" in message:
+                    logger.error(message, exc_info=True)
+                    raise ToolError(
+                        "Simplified batch item is missing required fields; include entity data in the 'data' payload."
+                    ) from exc
+                if "multiple values for keyword argument" in message:
+                    duplicated = message.split("'")[-2] if "'" in message else "field"
+                    logger.error(message, exc_info=True)
+                    raise ToolError(
+                        f"Duplicate '{duplicated}' detected inside a batch item. Provide each field once per item."
+                    ) from exc
+                logger.error(message, exc_info=True)
+                raise
             except (ToolError, Exception) as exc:
                 errors.append({"index": item_index, "error": str(exc)})
                 if not continue_on_error:
@@ -349,4 +502,3 @@ def register_simplified_bookstack_tools(mcp: FastMCP) -> None:
             "results": successes,
             "errors": errors,
         }
-

@@ -91,7 +91,7 @@ export async function runHTTP(server) {
             'http://localhost',
             'http://127.0.0.1',
             'http://192.168.50.90',
-            'https://knowledge.oculair.ca'
+            'http://192.168.50.80:8087'
         ];
         const allowedHeaders = ['Content-Type', 'MCP-Protocol-Version', 'MCP-Session-ID'];
         const exposedHeaders = ['MCP-Session-ID'];
