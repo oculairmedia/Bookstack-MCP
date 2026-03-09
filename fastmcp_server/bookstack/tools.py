@@ -432,6 +432,31 @@ def _build_cache_key(method: str, path: str, params: Optional[Dict[str, Any]], j
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
+def _cache_tags_for_request(method: str, path: str) -> set[str]:
+    """Annotate cached GET requests with entity tags for targeted invalidation."""
+
+    if method.upper() != "GET":
+        return set()
+
+    entity_tag_map = {
+        "/api/bookshelves": "bookshelf",
+        "/api/books": "book",
+        "/api/chapters": "chapter",
+        "/api/pages": "page",
+        "/api/image-gallery": "image",
+    }
+
+    for prefix, entity_type in entity_tag_map.items():
+        if path == prefix or path.startswith(f"{prefix}/"):
+            tags = {f"entity:{entity_type}", f"collection:{entity_type}"}
+            suffix = path[len(prefix):].strip("/")
+            if suffix and suffix.isdigit():
+                tags.add(f"entity:{entity_type}:{suffix}")
+            return tags
+
+    return set()
+
+
 def _invalidate_entity_cache(entity_type: str, entity_id: Optional[int] = None) -> None:
     """Invalidate cached payloads for a given entity type."""
 
@@ -1160,7 +1185,12 @@ def _bookstack_request(
             ) from exc
 
     if cache_bucket is not None and cache_key is not None:
-        cache_bucket.set(cache_key, payload, ttl=_cache_ttl_for(path))
+        cache_bucket.set(
+            cache_key,
+            payload,
+            ttl=_cache_ttl_for(path),
+            tags=_cache_tags_for_request(method, path),
+        )
 
     return payload
 

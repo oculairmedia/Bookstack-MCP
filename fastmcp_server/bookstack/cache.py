@@ -6,7 +6,7 @@ import hashlib
 import json
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Callable
+from typing import Any, Callable, Dict, Optional, Set
 from functools import wraps
 import threading
 
@@ -14,16 +14,17 @@ import threading
 @dataclass
 class CacheEntry:
     """Cached response with metadata."""
-    
+
     data: Any
     timestamp: float
     ttl: float
     hits: int = 0
-    
+    tags: Set[str] | None = None
+
     def is_expired(self) -> bool:
         """Check if cache entry has expired."""
         return time.time() - self.timestamp > self.ttl
-    
+
     def increment_hits(self) -> None:
         """Track cache hit count."""
         self.hits += 1
@@ -31,7 +32,7 @@ class CacheEntry:
 
 class SmartCache:
     """Thread-safe LRU cache with TTL and statistics."""
-    
+
     def __init__(self, max_size: int = 1000, default_ttl: float = 300):
         self.max_size = max_size
         self.default_ttl = default_ttl
@@ -67,17 +68,25 @@ class SmartCache:
             self._stats["hits"] += 1
             return entry.data
     
-    def set(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
+    def set(
+        self,
+        key: str,
+        value: Any,
+        ttl: Optional[float] = None,
+        *,
+        tags: Optional[Set[str]] = None,
+    ) -> None:
         """Store value in cache with TTL."""
         with self._lock:
             # Evict oldest entry if cache is full
             if len(self._cache) >= self.max_size and key not in self._cache:
                 self._evict_lru()
-            
+
             self._cache[key] = CacheEntry(
                 data=value,
                 timestamp=time.time(),
                 ttl=ttl or self.default_ttl,
+                tags=set(tags or ()),
             )
     
     def _evict_lru(self) -> None:
@@ -93,16 +102,25 @@ class SmartCache:
         del self._cache[lru_key]
         self._stats["evictions"] += 1
     
-    def invalidate(self, pattern: Optional[str] = None) -> int:
-        """Invalidate cache entries matching pattern."""
+    def invalidate(
+        self,
+        pattern: Optional[str] = None,
+        *,
+        tags: Optional[Set[str]] = None,
+    ) -> int:
+        """Invalidate cache entries matching a pattern or tag set."""
         with self._lock:
-            if pattern is None:
+            if pattern is None and not tags:
                 count = len(self._cache)
                 self._cache.clear()
                 return count
-            
-            # Simple pattern matching (can be enhanced)
-            keys_to_delete = [k for k in self._cache.keys() if pattern in k]
+
+            keys_to_delete = []
+            for key, entry in self._cache.items():
+                pattern_match = pattern is not None and pattern in key
+                tag_match = bool(tags and entry.tags and entry.tags.intersection(tags))
+                if pattern_match or tag_match:
+                    keys_to_delete.append(key)
             for key in keys_to_delete:
                 del self._cache[key]
             return len(keys_to_delete)
@@ -181,10 +199,10 @@ class BookStackCache:
         
         cache = cache_map.get(entity_type)
         if cache:
+            invalidate_tags = {f"entity:{entity_type}", f"collection:{entity_type}"}
             if entity_id:
-                cache.invalidate(str(entity_id))
-            else:
-                cache.invalidate()
+                invalidate_tags.add(f"entity:{entity_type}:{entity_id}")
+            cache.invalidate(tags=invalidate_tags)
     
     def get_all_stats(self) -> Dict[str, Any]:
         """Get statistics for all caches."""
@@ -198,4 +216,3 @@ class BookStackCache:
 
 # Global BookStack cache
 bookstack_cache = BookStackCache()
-
