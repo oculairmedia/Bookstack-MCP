@@ -307,6 +307,74 @@ async def test_image_create_from_url_with_mime_fallback(monkeypatch: MonkeyPatch
 
 
 @pytest.mark.asyncio
+async def test_image_create_from_url_rejects_unsupported_content_type(monkeypatch: MonkeyPatch) -> None:
+    """Reject remote content when the server reports an unsupported MIME type."""
+    mcp = FastMCP("test")
+    register_bookstack_tools(mcp)
+
+    class FakeResponse:
+        status_code = 200
+        headers = {"content-type": "text/html"}
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, chunk_size=8192):
+            yield b"<html>not an image</html>"
+
+    def fake_get(url, **kwargs):
+        return FakeResponse()
+
+    monkeypatch.setattr("requests.get", fake_get)
+
+    tool = await mcp.get_tool("bookstack_manage_images")
+
+    with pytest.raises(ToolError) as exc:
+        await tool.run({
+            "operation": "create",
+            "name": "bad-mime",
+            "image": "https://example.com/image.png",
+            "uploaded_to": DEFAULT_PAGE_ID,
+        })
+
+    assert "unsupported remote image mime type" in str(exc.value).lower()
+
+
+@pytest.mark.asyncio
+async def test_image_create_from_url_rejects_missing_mime_without_image_extension(monkeypatch: MonkeyPatch) -> None:
+    """Reject remote content when MIME type is missing and the URL gives no allowed image hint."""
+    mcp = FastMCP("test")
+    register_bookstack_tools(mcp)
+
+    class FakeResponse:
+        status_code = 200
+        headers = {}
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, chunk_size=8192):
+            yield b"binary-data"
+
+    def fake_get(url, **kwargs):
+        return FakeResponse()
+
+    monkeypatch.setattr("requests.get", fake_get)
+
+    tool = await mcp.get_tool("bookstack_manage_images")
+
+    with pytest.raises(ToolError) as exc:
+        await tool.run({
+            "operation": "create",
+            "name": "unknown-mime",
+            "image": "https://example.com/download.bin",
+            "uploaded_to": DEFAULT_PAGE_ID,
+        })
+
+    assert "unable to determine a supported image mime type" in str(exc.value).lower()
+
+
+@pytest.mark.asyncio
 async def test_image_create_from_url_timeout(monkeypatch: MonkeyPatch) -> None:
     """Test handling of timeout when fetching from URL."""
     import requests

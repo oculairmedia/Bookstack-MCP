@@ -830,13 +830,31 @@ def _fetch_image_from_url(url: str, fallback_name: str) -> PreparedImage:
 
         # Determine MIME type
         mime_type = response.headers.get('content-type', '').split(';')[0].lower()
-        if not mime_type or mime_type not in _ALLOWED_MIME_TYPES:
-            # Fallback to guessing from URL extension
-            guessed_type, _ = mimetypes.guess_type(current_url)
-            if guessed_type and guessed_type in _ALLOWED_MIME_TYPES:
-                mime_type = guessed_type
-            else:
-                mime_type = _DEFAULT_MIME_TYPE
+        guessed_type, _ = mimetypes.guess_type(current_url)
+
+        if mime_type:
+            if mime_type not in _ALLOWED_MIME_TYPES:
+                raise _tool_error(
+                    "Unsupported remote image MIME type",
+                    hint="Use a URL that serves one of the supported image MIME types.",
+                    context={
+                        "url": current_url,
+                        "content_type": mime_type,
+                        "allowed_mime_types": sorted(_ALLOWED_MIME_TYPES),
+                    },
+                )
+        elif guessed_type and guessed_type in _ALLOWED_MIME_TYPES:
+            mime_type = guessed_type
+        else:
+            raise _tool_error(
+                "Unable to determine a supported image MIME type",
+                hint="Ensure the URL has a supported image extension or the server returns an image Content-Type header.",
+                context={
+                    "url": current_url,
+                    "guessed_type": guessed_type,
+                    "allowed_mime_types": sorted(_ALLOWED_MIME_TYPES),
+                },
+            )
 
         # Extract filename
         filename = _extract_filename_from_url(current_url, fallback_name)
