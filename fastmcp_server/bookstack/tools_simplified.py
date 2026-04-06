@@ -113,6 +113,41 @@ _SIMPLIFIED_KNOWN_FIELDS = (
     "priority",
 )
 
+# Usage examples shown in error messages to guide agents toward correct format
+_USAGE_EXAMPLES = {
+    "create_page": (
+        'bookstack_content_crud(action="create_page", name="Page Title", '
+        'data=\'{"chapter_id": 245, "markdown": "## Your content here"}\')'
+    ),
+    "update_page": (
+        'bookstack_content_crud(action="update_page", content_id=123, '
+        'data=\'{"markdown": "## Updated content"}\')'
+    ),
+    "create_book": (
+        'bookstack_content_crud(action="create_book", name="Book Title", '
+        'description="Book description")'
+    ),
+    "create_chapter": (
+        'bookstack_content_crud(action="create_chapter", name="Chapter Title", '
+        'data=\'{"book_id": 10}\')'
+    ),
+    "_default": (
+        'bookstack_content_crud(action="create_page", name="Title", '
+        'data=\'{"chapter_id": 245, "markdown": "content"}\')'
+    ),
+}
+
+
+def _usage_hint(action: str) -> str:
+    """Return a usage example string for the given action."""
+    example = _USAGE_EXAMPLES.get(action, _USAGE_EXAMPLES["_default"])
+    return (
+        f"Correct format example:\n  {example}\n\n"
+        f"IMPORTANT: Fields like chapter_id, book_id, markdown, html, and tags "
+        f"MUST go inside the 'data' JSON string parameter, NOT as direct arguments."
+    )
+
+
 _ID_FIELD_NAMES = {"book_id", "chapter_id", "image_id"}
 
 
@@ -233,9 +268,15 @@ def register_simplified_bookstack_tools(mcp: FastMCP) -> None:
 
         # Parse action into operation and entity_type
         parts = action.split("_", 1)
-        operation = parts[0]
+        _VALID_OPERATIONS: set[OperationType] = {"create", "read", "update", "delete"}
+        _VALID_ENTITIES: set[EntityType] = {"book", "bookshelf", "chapter", "page"}
+        raw_op = parts[0]
+        _ensure(raw_op in _VALID_OPERATIONS, f"Invalid operation '{raw_op}'. Must be one of: {', '.join(_VALID_OPERATIONS)}")
+        operation: OperationType = raw_op  # type: ignore[assignment]  # validated above
         entity_map = {"page": "page", "book": "book", "chapter": "chapter", "shelf": "bookshelf"}
-        entity_type = entity_map.get(parts[1], parts[1])
+        raw_entity = entity_map.get(parts[1], parts[1]) if len(parts) > 1 else ""
+        _ensure(raw_entity in _VALID_ENTITIES, f"Invalid entity type '{raw_entity}'. Must be one of: {', '.join(_VALID_ENTITIES)}")
+        entity_type: EntityType = raw_entity  # type: ignore[assignment]  # validated above
 
         try:
             parsed_data = _coerce_json_object(data, label="data") if data else {}
@@ -272,24 +313,25 @@ def register_simplified_bookstack_tools(mcp: FastMCP) -> None:
             )
         except TypeError as exc:
             message = str(exc)
-            if "multiple values for keyword argument" in message:
-                duplicated = message.split("'")[-2] if "'" in message else "field"
+            hint = _usage_hint(action)
+            if 'multiple values for keyword argument' in message:
+                duplicated = message.split("'")[-2] if "'" in message else 'field'
                 logger.error(message, exc_info=True)
                 raise ToolError(
-                    f"Duplicate '{duplicated}' detected. Provide each field either via top-level parameters or inside 'data', not both."
+                    f"Duplicate '{duplicated}' detected. Provide each field either via "
+                    f"top-level parameters (name, description) or inside 'data', not both."
+                    f"\n\n{hint}"
                 ) from exc
             logger.error(message, exc_info=True)
+            raise ToolError(f"{message}\n\n{hint}") from exc
+        except ToolError:
+            # ToolError from _build_content_operation already has structured hints.
+            # Re-raise as-is — FastMCP returns it as a proper error to the agent.
             raise
         except Exception as e:
-            logger.error(f"Error in bookstack_content_crud: {e}", exc_info=True)
-            return {
-                "action": action,
-                "operation": operation,
-                "entity_type": entity_type,
-                "success": False,
-                "error": str(e),
-                "content_id": content_id,
-            }
+            hint = _usage_hint(action)
+            logger.error(f'Error in bookstack_content_crud: {e}', exc_info=True)
+            raise ToolError(f"{e}\n\n{hint}") from e
 
         # Aggressively truncate response to prevent JSON-RPC message size issues
         def truncate_recursive(obj: Any, max_str_len: int = 1000, max_depth: int = 10, current_depth: int = 0) -> Any:
@@ -474,21 +516,30 @@ def register_simplified_bookstack_tools(mcp: FastMCP) -> None:
                 })
             except TypeError as exc:
                 message = str(exc)
-                if "missing" in message and "required keyword-only arguments" in message:
+                batch_hint = (
+                    'Correct batch format:\n'
+                    '  bookstack_batch_operations(operation="bulk_create", entity_type="page", items=[\n'
+                    '    {"data": \'{ "name": "Title", "chapter_id": 245, "markdown": "content" }\'}\n'
+                    '  ])\n'
+                    'IMPORTANT: All entity fields MUST go inside the item "data" JSON string.'
+                )
+                if 'missing' in message and 'required keyword-only arguments' in message:
                     logger.error(message, exc_info=True)
                     raise ToolError(
-                        "Simplified batch item is missing required fields; include entity data in the 'data' payload."
+                        f'Batch item is missing required fields; include entity data in the "data" payload.'
+                        f'\n\n{batch_hint}'
                     ) from exc
-                if "multiple values for keyword argument" in message:
-                    duplicated = message.split("'")[-2] if "'" in message else "field"
+                if 'multiple values for keyword argument' in message:
+                    duplicated = message.split("'")[-2] if "'" in message else 'field'
                     logger.error(message, exc_info=True)
                     raise ToolError(
-                        f"Duplicate '{duplicated}' detected inside a batch item. Provide each field once per item."
+                        f"Duplicate '{duplicated}' detected inside a batch item. "
+                        f"Provide each field once per item.\n\n{batch_hint}"
                     ) from exc
                 logger.error(message, exc_info=True)
-                raise
+                raise ToolError(f"{message}\n\n{batch_hint}") from exc
             except (ToolError, Exception) as exc:
-                errors.append({"index": item_index, "error": str(exc)})
+                errors.append({'index': item_index, 'error': str(exc)})
                 if not continue_on_error:
                     break
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import copy
 import ipaddress
 import json
@@ -653,7 +654,8 @@ def _is_url(value: str) -> bool:
     try:
         parsed = urlparse(value.strip())
         return parsed.scheme.lower() in _ALLOWED_URL_SCHEMES and bool(parsed.netloc)
-    except Exception:
+    except Exception as exc:
+        logger.debug("_is_url: failed to parse %r: %s", value[:200], exc)
         return False
 
 
@@ -668,8 +670,8 @@ def _extract_filename_from_url(url: str, fallback: str) -> str:
             filename = re.sub(r'[^\w\-_\.]', '_', filename)
             if filename and len(filename) <= 255:
                 return filename
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("_extract_filename_from_url: failed for %r: %s", url[:200], exc)
     return fallback
 
 
@@ -1108,9 +1110,10 @@ def _bookstack_request(
                             error_detail = f": {error_json['error']}"
                         elif "message" in error_json:
                             error_detail = f": {error_json['message']}"
-                except Exception:
-                    pass
-            except Exception:  # pragma: no cover - defensive guard
+                except Exception as json_exc:
+                    logger.debug("_bookstack_request: could not parse error JSON: %s", json_exc)
+            except Exception as preview_exc:  # pragma: no cover - defensive guard
+                logger.debug("_bookstack_request: could not extract response preview: %s", preview_exc)
                 preview = None
 
         # Provide specific hints for common HTTP errors
@@ -1250,9 +1253,10 @@ def _bookstack_request_form(
                             error_detail = f": {error_json['error']}"
                         elif 'message' in error_json:
                             error_detail = f": {error_json['message']}"
-                except Exception:
-                    pass
-            except Exception:  # pragma: no cover - defensive guard
+                except Exception as json_exc:
+                    logger.debug("_bookstack_request_form: could not parse error JSON: %s", json_exc)
+            except Exception as preview_exc:  # pragma: no cover - defensive guard
+                logger.debug("_bookstack_request_form: could not extract response preview: %s", preview_exc)
                 preview = None
 
         # Provide specific hints for common HTTP errors
@@ -1420,7 +1424,7 @@ def _decode_base64_string(payload: str) -> bytes:
     try:
         cleaned = re.sub(r"\s+", "", payload)
         return base64.b64decode(cleaned, validate=True)
-    except (ValueError, binascii.Error) as exc:  # type: ignore[name-defined]
+    except (ValueError, binascii.Error) as exc:
         raise _tool_error(
             "Failed to decode base64 image data",
             hint="Verify the string is base64 encoded without extra whitespace or URL encoding.",
@@ -1431,10 +1435,6 @@ def _decode_base64_string(payload: str) -> bytes:
             "Unexpected error while decoding base64 image data",
             context={"error": str(exc)},
         ) from exc
-
-
-# Avoid importing binascii at module import time only if needed
-import binascii  # noqa: E402  (after helper definition for mypy clarity)
 
 
 def _normalize_image_list_response(
@@ -1903,11 +1903,6 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
     """Register BookStack tools on the provided FastMCP instance."""
 
     @track_tool("bookstack_manage_content")
-    @track_tool("bookstack_list_content")
-    @track_tool("bookstack_search")
-    @track_tool("bookstack_semantic_search")
-    @track_tool("bookstack_manage_images")
-    @track_tool("bookstack_search_images")
     @mcp.tool(
         annotations={
             "title": "Manage BookStack Content",
@@ -2084,6 +2079,7 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
             collector.record_entity_operation(entity_type, operation)
         return result
 
+    @track_tool("bookstack_list_content")
     @mcp.tool(
         annotations={
             "title": "List BookStack Content",
@@ -2264,6 +2260,7 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
             result["chapter_id"] = chapter_id
         return result
 
+    @track_tool("bookstack_search")
     @mcp.tool(
         annotations={
             "title": "Search BookStack",
@@ -2364,6 +2361,7 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
             payload["total"] = response["total"]
         return payload
 
+    @track_tool("bookstack_manage_images")
     @mcp.tool(
         annotations={
             "title": "Manage Image Gallery",
@@ -2565,6 +2563,7 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
         }
         return result
 
+    @track_tool("bookstack_search_images")
     @mcp.tool(
         annotations={
             "title": "Search Image Gallery",
