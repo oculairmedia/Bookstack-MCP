@@ -180,7 +180,7 @@ async def test_bookshelves_listing(monkeypatch: MonkeyPatch) -> None:
     
     def fake_request(method: str, path: str, *, params=None, **kwargs) -> Dict[str, Any]:
         assert method == "GET"
-        assert path == "/api/shelves"
+        assert path == "/api/bookshelves"
         return api_response
     
     monkeypatch.setattr(tools, "_bookstack_request", fake_request)
@@ -193,7 +193,8 @@ async def test_bookshelves_listing(monkeypatch: MonkeyPatch) -> None:
     data = json.loads(result.content[0].text)
     assert data["success"] is True
     assert data["metadata"]["total"] == 2
-    assert data["metadata"]["scoped"] is False
+    # Scoped field is only present for scoped listings
+    assert data["metadata"].get("scoped", False) is False
 
 
 @pytest.mark.asyncio
