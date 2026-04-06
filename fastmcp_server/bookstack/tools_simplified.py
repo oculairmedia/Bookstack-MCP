@@ -31,6 +31,25 @@ from .tools import (
 )
 
 
+def truncate_recursive(obj: Any, max_str_len: int = 1000, max_depth: int = 10, current_depth: int = 0) -> Any:
+    """Recursively truncate all strings in a nested structure."""
+    if current_depth > max_depth:
+        return "... (max depth reached)"
+
+    if isinstance(obj, str):
+        if len(obj) > max_str_len:
+            return obj[:max_str_len] + f"... (truncated from {len(obj)} chars)"
+        return obj
+    elif isinstance(obj, dict):
+        return {k: truncate_recursive(v, max_str_len, max_depth, current_depth + 1) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        if len(obj) > 50:
+            return [truncate_recursive(item, max_str_len, max_depth, current_depth + 1) for item in obj[:50]] + [f"... ({len(obj) - 50} more items)"]
+        return [truncate_recursive(item, max_str_len, max_depth, current_depth + 1) for item in obj]
+    else:
+        return obj
+
+
 # Simplified schemas - use string type for complex payloads to avoid deep nesting
 _SIMPLE_OPTIONAL_INT_SCHEMA: Dict[str, Any] = {
     "oneOf": [
@@ -243,7 +262,6 @@ def register_simplified_bookstack_tools(mcp: FastMCP) -> None:
         name: Optional[str] = None,
         description: Optional[str] = None,
         data: Optional[str] = None,
-        request_heartbeat: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """CRUD operations for BookStack content.
 
@@ -253,7 +271,6 @@ def register_simplified_bookstack_tools(mcp: FastMCP) -> None:
             name: Entity name/title (for create/update)
             description: Entity description (for create/update)
             data: Additional fields as JSON string (e.g. '{"content":"...","book_id":1}')
-            request_heartbeat: Ignored (for MCP client compatibility)
         """
         import json as json_module
         logger.info(
@@ -332,25 +349,6 @@ def register_simplified_bookstack_tools(mcp: FastMCP) -> None:
             hint = _usage_hint(action)
             logger.error(f'Error in bookstack_content_crud: {e}', exc_info=True)
             raise ToolError(f"{e}\n\n{hint}") from e
-
-        # Aggressively truncate response to prevent JSON-RPC message size issues
-        def truncate_recursive(obj: Any, max_str_len: int = 1000, max_depth: int = 10, current_depth: int = 0) -> Any:
-            """Recursively truncate all strings in a nested structure."""
-            if current_depth > max_depth:
-                return "... (max depth reached)"
-
-            if isinstance(obj, str):
-                if len(obj) > max_str_len:
-                    return obj[:max_str_len] + f"... (truncated from {len(obj)} chars)"
-                return obj
-            elif isinstance(obj, dict):
-                return {k: truncate_recursive(v, max_str_len, max_depth, current_depth + 1) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                if len(obj) > 50:
-                    return [truncate_recursive(item, max_str_len, max_depth, current_depth + 1) for item in obj[:50]] + [f"... ({len(obj) - 50} more items)"]
-                return [truncate_recursive(item, max_str_len, max_depth, current_depth + 1) for item in obj]
-            else:
-                return obj
 
         # Apply aggressive truncation for read operations
         if operation == "read":

@@ -18,25 +18,25 @@ class InputValidator:
     # Security: SQL injection checks default to OFF — wiki content legitimately contains SQL keywords.
     # BookStack API uses parameterized queries; this layer need not duplicate that protection.
     SQL_INJECTION_PATTERNS = [
-        r"(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE)\b)",
-        r"(--|;|\/\*|\*\/|xp_|sp_)",
-        r"(\bOR\b.*=.*|1\s*=\s*1)",
+        re.compile(r"(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE)\b)", re.IGNORECASE),
+        re.compile(r"(--|;|\/\*|\*\/|xp_|sp_)", re.IGNORECASE),
+        re.compile(r"(\bOR\b.*=.*|1\s*=\s*1)", re.IGNORECASE),
     ]
     
     XSS_PATTERNS = [
-        r"<script[^>]*>.*?</script>",
-        r"javascript:",
-        r"on\w+\s*=",
-        r"<iframe",
-        r"<object",
-        r"<embed",
+        re.compile(r"<script[^>]*>.*?</script>", re.IGNORECASE),
+        re.compile(r"javascript:", re.IGNORECASE),
+        re.compile(r"on\w+\s*=", re.IGNORECASE),
+        re.compile(r"<iframe", re.IGNORECASE),
+        re.compile(r"<object", re.IGNORECASE),
+        re.compile(r"<embed", re.IGNORECASE),
     ]
     
     PATH_TRAVERSAL_PATTERNS = [
-        r"\.\./",
-        r"\.\.",
-        r"%2e%2e",
-        r"\.\.\\",
+        re.compile(r"\.\./", re.IGNORECASE),
+        re.compile(r"\.\.", re.IGNORECASE),
+        re.compile(r"%2e%2e", re.IGNORECASE),
+        re.compile(r"\.\.\\", re.IGNORECASE),
     ]
     
     # Size limits
@@ -83,17 +83,17 @@ class InputValidator:
         # Security checks
         if check_sql_injection:
             for sql_pattern in cls.SQL_INJECTION_PATTERNS:
-                if re.search(sql_pattern, value, re.IGNORECASE):
+                if sql_pattern.search(value):
                     raise ValidationError(f"{field_name} contains potentially malicious SQL patterns")
         
         if check_xss:
             for xss_pattern in cls.XSS_PATTERNS:
-                if re.search(xss_pattern, value, re.IGNORECASE):
+                if xss_pattern.search(value):
                     raise ValidationError(f"{field_name} contains potentially malicious XSS patterns")
         
         if check_path_traversal:
             for path_pattern in cls.PATH_TRAVERSAL_PATTERNS:
-                if re.search(path_pattern, value, re.IGNORECASE):
+                if path_pattern.search(value):
                     raise ValidationError(f"{field_name} contains path traversal patterns")
         
         return value
