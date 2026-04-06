@@ -16,7 +16,7 @@ import socket
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Annotated, Any, Dict, Literal, Optional, Sequence, Tuple, Union
+from typing import Annotated, Any, Dict, Literal, NoReturn, Optional, Sequence, Tuple, Union
 from urllib.parse import unquote, urljoin, urlparse
 
 import requests
@@ -1049,6 +1049,109 @@ def _filter_collection(
     return data, None
 
 
+def _handle_bookstack_http_error(
+    exc: requests.HTTPError,
+    default_hint: str,
+    method: str,
+    path: str,
+    params: Optional[Dict[str, Any]] = None,
+    json: Optional[Dict[str, Any]] = None,
+    data: Optional[Dict[str, Any]] = None,
+    files: Optional[Dict[str, Any]] = None,
+    hint_401: Optional[str] = None,
+    hint_403: Optional[str] = None,
+    hint_404: Optional[str] = None,
+    hint_409: Optional[str] = None,
+    hint_422: Optional[str] = None,
+) -> NoReturn:
+    """Extract error details from HTTP error and raise formatted tool error.
+    
+    Args:
+        exc: The HTTPError exception from requests
+        default_hint: Default hint message to use if no status-specific hint matches
+        method: HTTP method used
+        path: API path
+        params: Query parameters (for JSON requests)
+        json: JSON payload (for JSON requests)
+        data: Form data (for multipart/form requests)
+        files: Files dict (for multipart/form requests)
+        hint_401: Custom hint for 401 errors (uses default if None)
+        hint_403: Custom hint for 403 errors (uses default if None)
+        hint_404: Custom hint for 404 errors (uses default if None)
+        hint_409: Custom hint for 409 errors (uses default if None)
+        hint_422: Custom hint for 422 errors (uses default if None)
+        
+    Raises:
+        McpError: Always raises with formatted error message and context
+    """
+    status = exc.response.status_code if exc.response is not None else "unknown"
+    status_code = status if isinstance(status, int) else 0
+    preview: Optional[str] = None
+    error_detail = ""
+    if exc.response is not None:
+        try:
+            preview = exc.response.text[:400]
+            # Try to extract error message from JSON response
+            try:
+                error_json = exc.response.json()
+                if isinstance(error_json, dict):
+                    if "error" in error_json:
+                        error_detail = f": {error_json['error']}"
+                    elif "message" in error_json:
+                        error_detail = f": {error_json['message']}"
+            except Exception as json_exc:
+                logger.debug("_handle_bookstack_http_error: could not parse error JSON: %s", json_exc)
+        except Exception as preview_exc:  # pragma: no cover - defensive guard
+            logger.debug("_handle_bookstack_http_error: could not extract response preview: %s", preview_exc)
+            preview = None
+
+    # Provide specific hints for common HTTP errors
+    hint = default_hint
+    if status == 409:
+        hint = hint_409 if hint_409 is not None else (
+            "Conflict error (409): This usually means a resource with the same name already exists, "
+            "or there's a constraint violation. Check the response_preview for details."
+        )
+    elif status == 404:
+        hint = hint_404 if hint_404 is not None else "Not found (404): The entity ID or endpoint doesn't exist. Verify the ID is correct."
+    elif status == 401:
+        hint = hint_401 if hint_401 is not None else "Unauthorized (401): Check your BS_TOKEN_ID and BS_TOKEN_SECRET environment variables."
+    elif status == 403:
+        hint = hint_403 if hint_403 is not None else "Forbidden (403): Your API token doesn't have permission for this operation."
+    elif status == 422:
+        hint = hint_422 if hint_422 is not None else (
+            "Validation error (422): The request payload is invalid. "
+            "Check the response_preview for field-specific errors."
+        )
+
+    error_msg = f"BookStack API request failed with HTTP {status}{error_detail}"
+    error_message = error_msg
+    
+    # Build context dict based on what was provided
+    context: Dict[str, Any] = {
+        "method": method,
+        "path": path,
+        "status": status,
+        "response_preview": preview,
+    }
+    
+    if params is not None:
+        context["params"] = params
+    if json is not None:
+        context["payload"] = json
+    if data is not None:
+        context["data_keys"] = list(data.keys())
+    if files is not None:
+        context["files_keys"] = list(files.keys())
+    
+    logger.error(
+        "bookstack.api_error",
+        extra={"context": {**context, "message": error_msg, "hint": hint}},
+    )
+
+    raise _tool_error(error_msg, hint=hint, context=context) from exc
+
+
 def _bookstack_request(
     method: str,
     path: str,
@@ -1097,74 +1200,14 @@ def _bookstack_request(
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else "unknown"
         status_code = status if isinstance(status, int) else 0
-        preview: Optional[str] = None
-        error_detail = ""
-        if exc.response is not None:
-            try:
-                preview = exc.response.text[:400]
-                # Try to extract error message from JSON response
-                try:
-                    error_json = exc.response.json()
-                    if isinstance(error_json, dict):
-                        if "error" in error_json:
-                            error_detail = f": {error_json['error']}"
-                        elif "message" in error_json:
-                            error_detail = f": {error_json['message']}"
-                except Exception as json_exc:
-                    logger.debug("_bookstack_request: could not parse error JSON: %s", json_exc)
-            except Exception as preview_exc:  # pragma: no cover - defensive guard
-                logger.debug("_bookstack_request: could not extract response preview: %s", preview_exc)
-                preview = None
-
-        # Provide specific hints for common HTTP errors
-        hint = "Verify the BookStack credentials, entity identifiers, and payload fields."
-        if status == 409:
-            hint = (
-                "Conflict error (409): This usually means a resource with the same name already exists, "
-                "or there's a constraint violation. Check the response_preview for details."
-            )
-        elif status == 404:
-            hint = "Not found (404): The entity ID or endpoint doesn't exist. Verify the ID is correct."
-        elif status == 401:
-            hint = "Unauthorized (401): Check your BS_TOKEN_ID and BS_TOKEN_SECRET environment variables."
-        elif status == 403:
-            hint = "Forbidden (403): Your API token doesn't have permission for this operation."
-        elif status == 422:
-            hint = (
-                "Validation error (422): The request payload is invalid. "
-                "Check the response_preview for field-specific errors."
-            )
-
-        error_msg = f"BookStack API request failed with HTTP {status}{error_detail}"
-        error_message = error_msg
-        logger.error(
-            "bookstack.api_error",
-            extra={
-                "context": {
-                    "message": error_msg,
-                    "hint": hint,
-                    "method": method,
-                    "path": path,
-                    "params": params,
-                    "payload": json,
-                    "status": status,
-                    "response_preview": preview,
-                }
-            },
+        _handle_bookstack_http_error(
+            exc,
+            default_hint="Verify the BookStack credentials, entity identifiers, and payload fields.",
+            method=method,
+            path=path,
+            params=params,
+            json=json,
         )
-
-        raise _tool_error(
-            error_msg,
-            hint=hint,
-            context={
-                "method": method,
-                "path": path,
-                "params": params,
-                "payload": json,
-                "status": status,
-                "response_preview": preview,
-            },
-        ) from exc
     except requests.RequestException as exc:  # pragma: no cover - network failure path
         error_message = str(exc)
         logger.error(
@@ -1239,51 +1282,18 @@ def _bookstack_request_form(
         )
         response.raise_for_status()
     except requests.HTTPError as exc:
-        status = exc.response.status_code if exc.response is not None else "unknown"
-        preview: Optional[str] = None
-        error_detail = ""
-        if exc.response is not None:
-            try:
-                preview = exc.response.text[:400]
-                # Try to extract error message from JSON response
-                try:
-                    error_json = exc.response.json()
-                    if isinstance(error_json, dict):
-                        if 'error' in error_json:
-                            error_detail = f": {error_json['error']}"
-                        elif 'message' in error_json:
-                            error_detail = f": {error_json['message']}"
-                except Exception as json_exc:
-                    logger.debug("_bookstack_request_form: could not parse error JSON: %s", json_exc)
-            except Exception as preview_exc:  # pragma: no cover - defensive guard
-                logger.debug("_bookstack_request_form: could not extract response preview: %s", preview_exc)
-                preview = None
-
-        # Provide specific hints for common HTTP errors
-        hint = "Confirm the image identifiers and ensure the API token grants image permissions."
-        if status == 409:
-            hint = "Conflict error (409): This usually means an image with the same name already exists. Check the response_preview for details."
-        elif status == 404:
-            hint = "Not found (404): The image ID doesn't exist. Verify the ID is correct."
-        elif status == 401:
-            hint = "Unauthorized (401): Check your BS_TOKEN_ID and BS_TOKEN_SECRET environment variables."
-        elif status == 403:
-            hint = "Forbidden (403): Your API token doesn't have permission for image operations."
-        elif status == 422:
-            hint = "Validation error (422): The image data is invalid. Check the response_preview for details."
-
-        raise _tool_error(
-            f"BookStack image endpoint returned HTTP {status}{error_detail}",
-            hint=hint,
-            context={
-                "method": method,
-                "path": path,
-                "status": status,
-                "data_keys": list((data or {}).keys()),
-                "files_keys": list((files or {}).keys()),
-                "response_preview": preview,
-            },
-        ) from exc
+        _handle_bookstack_http_error(
+            exc,
+            default_hint="Confirm the image identifiers and ensure the API token grants image permissions.",
+            method=method,
+            path=path,
+            data=data,
+            files=files,
+            hint_403="Forbidden (403): Your API token doesn't have permission for image operations.",
+            hint_404="Not found (404): The image ID doesn't exist. Verify the ID is correct.",
+            hint_409="Conflict error (409): This usually means an image with the same name already exists. Check the response_preview for details.",
+            hint_422="Validation error (422): The image data is invalid. Check the response_preview for details.",
+        )
     except requests.RequestException as exc:  # pragma: no cover - network failure path
         raise _tool_error(
             "Unable to reach the BookStack image endpoint",
