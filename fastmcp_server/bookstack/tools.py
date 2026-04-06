@@ -2129,10 +2129,6 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
             Optional[str],
             Field(default=None, description="Ignored parameter (for MCP client compatibility)"),
         ] = None,
-        request_heartbeat: Annotated[
-            Optional[bool],
-            Field(default=None, description="Ignored parameter (for MCP client compatibility)"),
-        ] = None,
     ) -> Dict[str, Any]:
         """Return a paginated listing of BookStack entities."""
 
@@ -2290,10 +2286,6 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
             Optional[int],
             WithJsonSchema({**copy.deepcopy(_OPTIONAL_INT_SCHEMA), "description": "Number of results per page (max 100)."}),
         ] = None,
-        request_heartbeat: Annotated[
-            Optional[bool],
-            Field(default=None, description="Ignored parameter (for MCP client compatibility)"),
-        ] = None,
     ) -> Dict[str, Any]:
         """Search across BookStack content."""
 
@@ -2439,10 +2431,6 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
                     }
                 },
             ),
-        ] = None,
-        request_heartbeat: Annotated[
-            Optional[bool],
-            Field(default=None, description="Ignored parameter (for MCP client compatibility)"),
         ] = None,
     ) -> Dict[str, Any]:
         """Unified CRUD interface for BookStack image gallery."""
@@ -2620,10 +2608,6 @@ def register_bookstack_tools(mcp: FastMCP) -> None:
         sort: Annotated[
             Optional[str],
             WithJsonSchema({**copy.deepcopy(_OPTIONAL_STRING_NO_MIN_SCHEMA), "description": "Sort expression supported by BookStack (e.g. '-created_at')."}),
-        ] = None,
-        request_heartbeat: Annotated[
-            Optional[bool],
-            Field(default=None, description="Ignored parameter (for MCP client compatibility)"),
         ] = None,
     ) -> Dict[str, Any]:
         """Advanced discovery tool for BookStack image gallery."""

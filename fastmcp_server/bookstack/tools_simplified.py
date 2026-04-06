@@ -406,10 +406,6 @@ def register_simplified_bookstack_tools(mcp: FastMCP) -> None:
             bool,
             Field(default=False, description="Validate without executing"),
         ] = False,
-        request_heartbeat: Annotated[
-            Optional[bool],
-            Field(default=None, description="Ignored parameter (for MCP client compatibility)"),
-        ] = None,
     ) -> Dict[str, Any]:
         """Simplified bulk operations for BookStack content.
         
