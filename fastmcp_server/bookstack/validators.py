@@ -15,7 +15,8 @@ class ValidationError(Exception):
 class InputValidator:
     """Comprehensive input validation for BookStack operations."""
     
-    # Security patterns
+    # Security: SQL injection checks default to OFF — wiki content legitimately contains SQL keywords.
+    # BookStack API uses parameterized queries; this layer need not duplicate that protection.
     SQL_INJECTION_PATTERNS = [
         r"(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE)\b)",
         r"(--|;|\/\*|\*\/|xp_|sp_)",
@@ -53,7 +54,7 @@ class InputValidator:
         max_length: Optional[int] = None,
         pattern: Optional[str] = None,
         allow_empty: bool = False,
-        check_sql_injection: bool = True,
+        check_sql_injection: bool = False,
         check_xss: bool = True,
         check_path_traversal: bool = False,
     ) -> str:
@@ -292,7 +293,7 @@ class BookStackValidator:
             f"{entity_type}_name",
             min_length=1,
             max_length=500,
-            check_sql_injection=True,
+            check_sql_injection=False,
             check_xss=True,
         )
     

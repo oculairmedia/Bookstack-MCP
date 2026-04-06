@@ -64,61 +64,61 @@ class TestInputValidatorString:
 class TestInputValidatorSQLInjection:
     """Test SQL injection detection patterns."""
 
-    def test_detects_select_statement(self) -> None:
+    def test_detects_select_statement_when_enabled(self) -> None:
         with pytest.raises(ValidationError) as exc:
-            InputValidator.validate_string("test' OR 1=1; SELECT * FROM users--", "test_field")
+            InputValidator.validate_string("test' OR 1=1; SELECT * FROM users--", "test_field", check_sql_injection=True)
         assert "malicious SQL patterns" in str(exc.value)
 
-    def test_detects_drop_statement(self) -> None:
+    def test_detects_drop_statement_when_enabled(self) -> None:
         with pytest.raises(ValidationError) as exc:
-            InputValidator.validate_string("'; DROP TABLE users;--", "test_field")
+            InputValidator.validate_string("'; DROP TABLE users;--", "test_field", check_sql_injection=True)
         assert "malicious SQL patterns" in str(exc.value)
 
-    def test_detects_insert_statement(self) -> None:
+    def test_detects_insert_statement_when_enabled(self) -> None:
         with pytest.raises(ValidationError) as exc:
-            InputValidator.validate_string("test'; INSERT INTO admin VALUES('hacker', 'pass');--", "test_field")
+            InputValidator.validate_string("test'; INSERT INTO admin VALUES('hacker', 'pass');--", "test_field", check_sql_injection=True)
         assert "malicious SQL patterns" in str(exc.value)
 
-    def test_detects_update_statement(self) -> None:
+    def test_detects_update_statement_when_enabled(self) -> None:
         with pytest.raises(ValidationError) as exc:
-            InputValidator.validate_string("test'; UPDATE users SET admin=1;--", "test_field")
+            InputValidator.validate_string("test'; UPDATE users SET admin=1;--", "test_field", check_sql_injection=True)
         assert "malicious SQL patterns" in str(exc.value)
 
-    def test_detects_delete_statement(self) -> None:
+    def test_detects_delete_statement_when_enabled(self) -> None:
         with pytest.raises(ValidationError) as exc:
-            InputValidator.validate_string("test'; DELETE FROM users;--", "test_field")
+            InputValidator.validate_string("test'; DELETE FROM users;--", "test_field", check_sql_injection=True)
         assert "malicious SQL patterns" in str(exc.value)
 
-    def test_detects_create_statement(self) -> None:
+    def test_detects_create_statement_when_enabled(self) -> None:
         with pytest.raises(ValidationError) as exc:
-            InputValidator.validate_string("test'; CREATE TABLE hacked (id INT);--", "test_field")
+            InputValidator.validate_string("test'; CREATE TABLE hacked (id INT);--", "test_field", check_sql_injection=True)
         assert "malicious SQL patterns" in str(exc.value)
 
-    def test_detects_alter_statement(self) -> None:
+    def test_detects_alter_statement_when_enabled(self) -> None:
         with pytest.raises(ValidationError) as exc:
-            InputValidator.validate_string("test'; ALTER TABLE users ADD COLUMN hacked INT;--", "test_field")
+            InputValidator.validate_string("test'; ALTER TABLE users ADD COLUMN hacked INT;--", "test_field", check_sql_injection=True)
         assert "malicious SQL patterns" in str(exc.value)
 
-    def test_detects_exec_statement(self) -> None:
+    def test_detects_exec_statement_when_enabled(self) -> None:
         with pytest.raises(ValidationError) as exc:
-            InputValidator.validate_string("test'; EXEC sp_executesql @sql;--", "test_field")
+            InputValidator.validate_string("test'; EXEC sp_executesql @sql;--", "test_field", check_sql_injection=True)
         assert "malicious SQL patterns" in str(exc.value)
 
-    def test_detects_sql_comment_patterns(self) -> None:
+    def test_detects_sql_comment_patterns_when_enabled(self) -> None:
         with pytest.raises(ValidationError) as exc:
-            InputValidator.validate_string("test'--", "test_field")
+            InputValidator.validate_string("test'--", "test_field", check_sql_injection=True)
         assert "malicious SQL patterns" in str(exc.value)
 
-    def test_detects_sql_or_equals_pattern(self) -> None:
+    def test_detects_sql_or_equals_pattern_when_enabled(self) -> None:
         with pytest.raises(ValidationError) as exc:
-            InputValidator.validate_string("admin' OR '1'='1", "test_field")
+            InputValidator.validate_string("admin' OR '1'='1", "test_field", check_sql_injection=True)
         assert "malicious SQL patterns" in str(exc.value)
 
-    def test_sql_injection_check_can_be_disabled(self) -> None:
+    def test_sql_keywords_allowed_by_default(self) -> None:
         result = InputValidator.validate_string(
-            "SELECT is a valid word", "test_field", check_sql_injection=False
+            "How to SELECT data from a database", "test_field"
         )
-        assert result == "SELECT is a valid word"
+        assert result == "How to SELECT data from a database"
 
 
 class TestInputValidatorXSS:
@@ -371,10 +371,9 @@ class TestBookStackValidatorEntityName:
             BookStackValidator.validate_entity_name(long_name, "page")
         assert "must be at most 500 characters" in str(exc.value)
 
-    def test_validate_entity_name_checks_sql_injection(self) -> None:
-        with pytest.raises(ValidationError) as exc:
-            BookStackValidator.validate_entity_name("test'; DROP TABLE books;--", "book")
-        assert "malicious SQL patterns" in str(exc.value)
+    def test_validate_entity_name_allows_sql_keywords(self) -> None:
+        result = BookStackValidator.validate_entity_name("How to SELECT and DROP data", "book")
+        assert result == "How to SELECT and DROP data"
 
     def test_validate_entity_name_checks_xss(self) -> None:
         with pytest.raises(ValidationError) as exc:
