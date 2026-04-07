@@ -306,6 +306,8 @@ def _bookstack_request(
     *,
     params: Optional[Dict[str, Any]] = None,
     json: Optional[Dict[str, Any]] = None,
+    _base_url_fn=None,
+    _headers_fn=None,
 ) -> Any:
     """Execute a JSON request against the BookStack API."""
 
@@ -328,7 +330,9 @@ def _bookstack_request(
             )
             return cached_payload
 
-    url = f"{_bookstack_base_url()}{path}"
+    resolve_base_url = _base_url_fn or _bookstack_base_url
+    resolve_headers = _headers_fn or _bookstack_headers
+    url = f"{resolve_base_url()}{path}"
     collector = get_metrics_collector()
     start_time = time.time()
     status_code: int = 0
@@ -338,7 +342,7 @@ def _bookstack_request(
         response = requests.request(
             method,
             url,
-            headers=_bookstack_headers(),
+            headers=resolve_headers(),
             params=params,
             json=json,
             timeout=60,
@@ -413,11 +417,15 @@ def _bookstack_request_form(
     *,
     data: Optional[Dict[str, Any]] = None,
     files: Optional[Dict[str, Tuple[str, bytes, str]]] = None,
+    _base_url_fn=None,
+    _headers_fn=None,
 ) -> Any:
     """Execute a multipart/form-data request against the BookStack API."""
 
-    url = f"{_bookstack_base_url()}{path}"
-    headers = _bookstack_headers()
+    resolve_base_url = _base_url_fn or _bookstack_base_url
+    resolve_headers = _headers_fn or _bookstack_headers
+    url = f"{resolve_base_url()}{path}"
+    headers = resolve_headers()
     headers.pop("Content-Type", None)
     try:
         response = requests.request(

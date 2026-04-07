@@ -433,11 +433,16 @@ def _prepare_cover_image_from_gallery(
     image_id: Any,
     *,
     fallback_name: Optional[str],
+    _request_fn=None,
+    _fetch_fn=None,
 ) -> PreparedImage:
     """Fetch an existing gallery image and return it as a PreparedImage."""
 
+    resolve_request = _request_fn or _bookstack_request
+    resolve_fetch = _fetch_fn or _fetch_image_from_url
+
     validated_id = _validate_positive_int(image_id, "'image_id'")
-    metadata = _bookstack_request("GET", f"/api/image-gallery/{validated_id}")
+    metadata = resolve_request("GET", f"/api/image-gallery/{validated_id}")
     if not isinstance(metadata, dict):
         raise _tool_error(
             "Unexpected response when fetching gallery image metadata",
@@ -465,7 +470,7 @@ def _prepare_cover_image_from_gallery(
         )
 
     effective_name = image_name or fallback_name or f"book-cover-{validated_id}"
-    return _fetch_image_from_url(image_url, effective_name)
+    return resolve_fetch(image_url, effective_name)
 
 
 def _prepare_form_data(payload: Dict[str, Any]) -> Dict[str, Any]:

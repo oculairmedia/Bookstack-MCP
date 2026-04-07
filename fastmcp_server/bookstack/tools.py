@@ -40,19 +40,23 @@ from .schemas import (
 
 from .api_client import (
     JSONFormatter, logger, ToolError,
-    _require_env, _bookstack_base_url, _bookstack_headers,
+    _require_env,
+    _bookstack_base_url as _api_bookstack_base_url,
+    _bookstack_headers as _api_bookstack_headers,
     _tool_error, _ensure,
     _select_cache_bucket, _cache_ttl_for, _build_cache_key,
     _cache_tags_for_request, _invalidate_entity_cache,
     _handle_bookstack_http_error,
-    _bookstack_request, _bookstack_request_form,
+    _bookstack_request as _api_bookstack_request,
+    _bookstack_request_form as _api_bookstack_request_form,
 )
 
 from .image_handling import (
     _is_url, _extract_filename_from_url, _decode_base64_string,
     _classify_disallowed_ip, _resolve_url_targets, _validate_remote_image_target,
-    _fetch_image_from_url,
-    _prepare_image_payload, _prepare_cover_image_from_gallery, _prepare_form_data,
+    _fetch_image_from_url as _img_fetch_image_from_url,
+    _prepare_image_payload, _prepare_form_data,
+    _prepare_cover_image_from_gallery as _img_prepare_cover_image_from_gallery,
     _normalize_image_list_response,
     _build_list_cache_key,
     _get_cached_list, _set_cached_list, _invalidate_list_cache,
@@ -76,6 +80,45 @@ from .content_operations import (
 from .cache import bookstack_cache
 from .metrics import get_metrics_collector, track_tool
 from .validators import BookStackValidator, InputValidator, ValidationError
+
+# Wrappers resolve dependencies through THIS module's globals so that
+# monkeypatch.setattr(tools, "_bookstack_base_url", …) is honoured.
+# Do NOT replace with plain re-exports — tests will break.
+
+_bookstack_base_url = _api_bookstack_base_url
+_bookstack_headers = _api_bookstack_headers
+
+import sys as _sys
+
+
+def _bookstack_request(method, path, *, params=None, json=None):
+    _mod = _sys.modules[__name__]
+    return _api_bookstack_request(
+        method, path, params=params, json=json,
+        _base_url_fn=_mod._bookstack_base_url,
+        _headers_fn=_mod._bookstack_headers,
+    )
+
+
+def _bookstack_request_form(method, path, *, data=None, files=None):
+    _mod = _sys.modules[__name__]
+    return _api_bookstack_request_form(
+        method, path, data=data, files=files,
+        _base_url_fn=_mod._bookstack_base_url,
+        _headers_fn=_mod._bookstack_headers,
+    )
+
+
+_fetch_image_from_url = _img_fetch_image_from_url
+
+
+def _prepare_cover_image_from_gallery(image_id, *, fallback_name=None):
+    _mod = _sys.modules[__name__]
+    return _img_prepare_cover_image_from_gallery(
+        image_id, fallback_name=fallback_name,
+        _request_fn=_mod._bookstack_request,
+        _fetch_fn=_mod._fetch_image_from_url,
+    )
 
 
 def register_bookstack_tools(mcp: FastMCP, exclude: Optional[set[str]] = None) -> None:
