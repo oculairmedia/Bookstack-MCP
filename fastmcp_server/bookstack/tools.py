@@ -13,6 +13,7 @@ import mimetypes
 import os
 import re
 import socket
+import tempfile
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -812,16 +813,25 @@ def _fetch_image_from_url(url: str, fallback_name: str) -> PreparedImage:
                 context={"url": url, "size": content_length}
             )
 
-        # Download with size limit
-        content = b""
-        for chunk in response.iter_content(chunk_size=8192):
-            content += chunk
-            if len(content) > _MAX_IMAGE_SIZE_BYTES:
-                raise _tool_error(
-                    f"Image download exceeded {_MAX_IMAGE_SIZE_BYTES} byte limit",
-                    hint="Use a smaller image or increase the size limit.",
-                    context={"url": url}
-                )
+        # Download with size limit using SpooledTemporaryFile for large images
+        spool = tempfile.SpooledTemporaryFile(max_size=5*1024*1024)  # 5MB spill threshold
+        try:
+            total_size = 0
+            for chunk in response.iter_content(chunk_size=8192):
+                spool.write(chunk)
+                total_size += len(chunk)
+                if total_size > _MAX_IMAGE_SIZE_BYTES:
+                    raise _tool_error(
+                        f"Image download exceeded {_MAX_IMAGE_SIZE_BYTES} byte limit",
+                        hint="Use a smaller image or increase the size limit.",
+                        context={"url": url}
+                    )
+            
+            # Read the final content
+            spool.seek(0)
+            content = spool.read()
+        finally:
+            spool.close()
 
         if not content:
             raise _tool_error(

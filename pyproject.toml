@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bookstack-mcp"
+version = "1.0.0"
+description = "BookStack MCP server for managing BookStack instances"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "fastmcp>=2.0,<3",
+    "requests>=2.31,<3",
+    "pydantic>=2.6,<3",
+    "python-dotenv>=1.0,<2",
+    "pytest>=7.0,<9",
+    "pytest-asyncio>=0.21,<1",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["fastmcp_server/tests"]
+pythonpath = ["fastmcp_server"]
+
+[tool.pyright]
+pythonPath = "fastmcp_server"
+include = ["fastmcp_server"]
+exclude = ["**/__pycache__"]
+reportMissingImports = false
