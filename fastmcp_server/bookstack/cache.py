@@ -164,8 +164,8 @@ def cached(ttl: Optional[float] = None, key_prefix: str = ""):
             return result
         
         # Add cache control methods
-        wrapper.cache_invalidate = lambda: _global_cache.invalidate(f"{key_prefix}:{func.__name__}")
-        wrapper.cache_stats = lambda: _global_cache.get_stats()
+        wrapper.cache_invalidate = lambda: _global_cache.invalidate(f"{key_prefix}:{func.__name__}")  # type: ignore[attr-defined]
+        wrapper.cache_stats = lambda: _global_cache.get_stats()  # type: ignore[attr-defined]
         
         return wrapper
     
@@ -182,10 +182,11 @@ class BookStackCache:
     """Specialized cache for BookStack entities."""
     
     def __init__(self):
-        self.books = SmartCache(max_size=500, default_ttl=600)  # 10 minutes
-        self.pages = SmartCache(max_size=1000, default_ttl=300)  # 5 minutes
-        self.images = SmartCache(max_size=2000, default_ttl=900)  # 15 minutes
-        self.search = SmartCache(max_size=200, default_ttl=180)  # 3 minutes
+        import os
+        self.books = SmartCache(max_size=500, default_ttl=int(os.environ.get("BS_CACHE_BOOKS_TTL", "600")))  # 10 minutes
+        self.pages = SmartCache(max_size=1000, default_ttl=int(os.environ.get("BS_CACHE_PAGES_TTL", "300")))  # 5 minutes
+        self.images = SmartCache(max_size=2000, default_ttl=int(os.environ.get("BS_CACHE_IMAGES_TTL", "900")))  # 15 minutes
+        self.search = SmartCache(max_size=200, default_ttl=int(os.environ.get("BS_CACHE_SEARCH_TTL", "180")))  # 3 minutes
     
     def invalidate_entity(self, entity_type: str, entity_id: Optional[int] = None) -> None:
         """Invalidate cache for specific entity type."""

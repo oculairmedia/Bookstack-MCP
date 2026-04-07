@@ -95,19 +95,22 @@ _TAG_ITEM_SCHEMA: Dict[str, Any] = {
     "additionalProperties": False,
 }
 
+# Reusable tag schema for inline items (without title/additionalProperties)
+_TAG_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "required": ["name", "value"],
+    "properties": {
+        "name": {"type": "string", "minLength": 1, "description": "Tag key."},
+        "value": {"type": "string", "description": "Tag value."},
+    },
+    "additionalProperties": False,
+}
+
 _TAG_LIST_SCHEMA: Dict[str, Any] = {
     "title": "Tags",
     "description": "Tags to assign to the entity.",
     "type": "array",
-    "items": {
-        "type": "object",
-        "required": ["name", "value"],
-        "properties": {
-            "name": {"type": "string", "minLength": 1, "description": "Tag key."},
-            "value": {"type": "string", "description": "Tag value."},
-        },
-        "additionalProperties": False,
-    },
+    "items": copy.deepcopy(_TAG_SCHEMA),
 }
 
 _BOOK_ASSOCIATIONS_SCHEMA: Dict[str, Any] = {
@@ -168,15 +171,7 @@ _BOOK_PAYLOAD_SCHEMA: Dict[str, Any] = {
         "tags": {
             "type": "array",
             "description": "Tags to assign to the entity.",
-            "items": {
-                "type": "object",
-                "required": ["name", "value"],
-                "properties": {
-                    "name": {"type": "string", "minLength": 1, "description": "Tag key."},
-                    "value": {"type": "string", "description": "Tag value."},
-                },
-                "additionalProperties": False,
-            },
+            "items": copy.deepcopy(_TAG_SCHEMA),
         },
         "image_id": {"type": "integer", "minimum": 1, "description": "Existing gallery image ID to reuse as the cover."},
         "cover_image": {"type": "string", "description": "Cover image payload (base64, data URL, or HTTP/HTTPS URL)."},
@@ -200,15 +195,7 @@ _BOOKSHELF_PAYLOAD_SCHEMA: Dict[str, Any] = {
         "tags": {
             "type": "array",
             "description": "Tags to assign to the entity.",
-            "items": {
-                "type": "object",
-                "required": ["name", "value"],
-                "properties": {
-                    "name": {"type": "string", "minLength": 1, "description": "Tag key."},
-                    "value": {"type": "string", "description": "Tag value."},
-                },
-                "additionalProperties": False,
-            },
+            "items": copy.deepcopy(_TAG_SCHEMA),
         },
     },
 }
@@ -227,15 +214,7 @@ _CHAPTER_PAYLOAD_SCHEMA: Dict[str, Any] = {
         "tags": {
             "type": "array",
             "description": "Tags to assign to the entity.",
-            "items": {
-                "type": "object",
-                "required": ["name", "value"],
-                "properties": {
-                    "name": {"type": "string", "minLength": 1, "description": "Tag key."},
-                    "value": {"type": "string", "description": "Tag value."},
-                },
-                "additionalProperties": False,
-            },
+            "items": copy.deepcopy(_TAG_SCHEMA),
         },
     },
 }
@@ -257,15 +236,7 @@ _PAGE_PAYLOAD_SCHEMA: Dict[str, Any] = {
         "tags": {
             "type": "array",
             "description": "Tags to assign to the entity.",
-            "items": {
-                "type": "object",
-                "required": ["name", "value"],
-                "properties": {
-                    "name": {"type": "string", "minLength": 1, "description": "Tag key."},
-                    "value": {"type": "string", "description": "Tag value."},
-                },
-                "additionalProperties": False,
-            },
+            "items": copy.deepcopy(_TAG_SCHEMA),
         },
     },
 }
@@ -361,9 +332,9 @@ _FALLBACK_FILE_NAME = "upload.bin"
 _DEFAULT_MIME_TYPE = "application/octet-stream"
 
 # Image URL fetching configuration
-_MAX_IMAGE_SIZE_BYTES = 50 * 1024 * 1024  # 50MB limit
-_REQUEST_TIMEOUT_SECONDS = 30
-_MAX_URL_REDIRECTS = 3
+_MAX_IMAGE_SIZE_BYTES = int(os.environ.get("BS_MAX_IMAGE_SIZE", str(50 * 1024 * 1024)))  # 50MB limit
+_REQUEST_TIMEOUT_SECONDS = int(os.environ.get("BS_FETCH_TIMEOUT", "30"))
+_MAX_URL_REDIRECTS = int(os.environ.get("BS_MAX_REDIRECTS", "3"))
 _ALLOWED_URL_SCHEMES = {"http", "https"}
 _ALLOWED_MIME_TYPES = {
     "image/jpeg",

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
 
@@ -166,7 +166,7 @@ class InputValidator:
         *,
         min_length: Optional[int] = None,
         max_length: Optional[int] = None,
-        item_validator: Optional[callable] = None,
+        item_validator: Optional[Callable[[Any, str], Any]] = None,
     ) -> List[Any]:
         """Validate array input."""
         
@@ -277,7 +277,7 @@ class BookStackValidator:
     """Specialized validators for BookStack entities."""
     
     @staticmethod
-    def validate_entity_id(entity_id: Any, entity_type: str) -> int:
+    def validate_entity_id(entity_id: Any, entity_type: str) -> Optional[int]:
         """Validate entity ID."""
         return InputValidator.validate_integer(
             entity_id,

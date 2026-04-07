@@ -85,6 +85,7 @@ class MetricsCollector:
     """Centralized metrics collection and reporting."""
     
     def __init__(self):
+        import os
         self._lock = threading.RLock()
         self._start_time = time.time()
         
@@ -104,7 +105,7 @@ class MetricsCollector:
         
         # Performance tracking
         self._slow_requests: List[RequestMetrics] = []
-        self._slow_threshold = 5.0  # seconds
+        self._slow_threshold = float(os.environ.get("BS_SLOW_REQUEST_THRESHOLD", "5.0"))  # seconds
     
     def record_request(
         self,
