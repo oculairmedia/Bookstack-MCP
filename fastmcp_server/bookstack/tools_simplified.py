@@ -17,6 +17,7 @@ from .tools import (
     _coerce_json_object,
     _ensure,
     _extract_known_fields,
+    _invalidate_entity_cache,
     _prepare_cover_image_from_gallery,
     _prepare_form_data,
     _prepare_image_payload,
@@ -371,6 +372,13 @@ def register_simplified_bookstack_tools(mcp: FastMCP) -> None:
         elif isinstance(response, dict) and isinstance(response.get("id"), int):
             result["content_id"] = response["id"]
 
+        if operation in {"create", "update", "delete"}:
+            invalidate_id = result.get("content_id")
+            _invalidate_entity_cache(
+                entity_type,
+                invalidate_id if isinstance(invalidate_id, int) else None,
+            )
+
         result_size = len(json_module.dumps(result))
         logger.info(f"bookstack_content_crud RETURNING: success=True, result_size={result_size} bytes")
 
@@ -512,6 +520,14 @@ def register_simplified_bookstack_tools(mcp: FastMCP) -> None:
                     prepared.path,
                     params=prepared.params,
                     json=prepared.json,
+                )
+                invalidate_id = item.get("id")
+                if not isinstance(invalidate_id, int) and isinstance(response, dict):
+                    candidate = response.get("id")
+                    invalidate_id = candidate if isinstance(candidate, int) else None
+                _invalidate_entity_cache(
+                    entity_type,
+                    invalidate_id if isinstance(invalidate_id, int) else None,
                 )
                 successes.append({
                     "index": item_index,

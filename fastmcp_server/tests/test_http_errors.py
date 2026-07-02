@@ -8,6 +8,7 @@ import pytest
 import requests
 from pytest import MonkeyPatch
 
+import fastmcp_server.bookstack.api_client as api_client
 import fastmcp_server.bookstack.tools as tools
 from fastmcp_server.bookstack.tools import ToolError
 
@@ -48,7 +49,7 @@ class TestBookstackRequestHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> FakeResponse:
             return FakeResponse(401, {"error": "Unauthorized"})
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
@@ -67,7 +68,7 @@ class TestBookstackRequestHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> FakeResponse:
             return FakeResponse(403, {"error": "Forbidden"})
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
@@ -85,7 +86,7 @@ class TestBookstackRequestHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> FakeResponse:
             return FakeResponse(404, {"error": "Not found"})
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
@@ -104,7 +105,7 @@ class TestBookstackRequestHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> FakeResponse:
             return FakeResponse(409, {"error": "Conflict: name already exists"})
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
@@ -122,7 +123,7 @@ class TestBookstackRequestHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> FakeResponse:
             return FakeResponse(422, {"error": "Validation failed", "details": {"name": "required"}})
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
@@ -140,7 +141,7 @@ class TestBookstackRequestHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> FakeResponse:
             return FakeResponse(500, {"error": "Internal server error"})
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
@@ -156,7 +157,7 @@ class TestBookstackRequestHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> None:
             raise requests.exceptions.Timeout("Connection timed out")
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
@@ -173,7 +174,7 @@ class TestBookstackRequestHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> None:
             raise requests.exceptions.ConnectionError("Failed to connect")
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
@@ -202,7 +203,7 @@ class TestBookstackRequestHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> NonJSONResponse:
             return NonJSONResponse()
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
@@ -219,7 +220,7 @@ class TestBookstackRequestHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> FakeResponse:
             return FakeResponse(404, {"error": "Book not found", "message": "No book with ID 999"})
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
@@ -239,7 +240,7 @@ class TestBookstackRequestFormHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> FakeResponse:
             return FakeResponse(401, {"error": "Unauthorized"})
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
@@ -258,7 +259,7 @@ class TestBookstackRequestFormHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> FakeResponse:
             return FakeResponse(403, {"error": "Forbidden"})
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
@@ -276,7 +277,7 @@ class TestBookstackRequestFormHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> FakeResponse:
             return FakeResponse(404, {"error": "Image not found"})
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
@@ -295,7 +296,7 @@ class TestBookstackRequestFormHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> FakeResponse:
             return FakeResponse(409, {"error": "Image name already exists"})
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
@@ -313,7 +314,7 @@ class TestBookstackRequestFormHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> FakeResponse:
             return FakeResponse(422, {"error": "Invalid image data"})
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
@@ -331,7 +332,7 @@ class TestBookstackRequestFormHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> None:
             raise requests.exceptions.Timeout("Connection timed out")
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
@@ -348,7 +349,7 @@ class TestBookstackRequestFormHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> None:
             raise requests.exceptions.ConnectionError("Failed to connect")
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
@@ -377,7 +378,7 @@ class TestBookstackRequestFormHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> NonJSONResponse:
             return NonJSONResponse()
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
@@ -394,7 +395,7 @@ class TestBookstackRequestFormHTTPErrors:
         def fake_request(method: str, url: str, **kwargs: Any) -> FakeResponse:
             return FakeResponse(404, {"message": "Image ID 999 not found in gallery"})
 
-        monkeypatch.setattr("requests.request", fake_request)
+        monkeypatch.setattr(api_client._session, "request", fake_request)
         monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://test.example.com")
         monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 

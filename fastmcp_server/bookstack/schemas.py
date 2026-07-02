@@ -252,8 +252,12 @@ class PreparedImage:
 
 
 @dataclass
-class CacheEntry:
-    """Compatibility wrapper for cached image list responses."""
+class ImageListCacheEntry:
+    """Compatibility wrapper for cached image list responses.
+
+    Distinct from ``cache.CacheEntry`` (the TTL-tracked cache record); this
+    only wraps a cached image-list payload with its metadata.
+    """
 
     data: Any
     metadata: Optional[Dict[str, Any]] = None

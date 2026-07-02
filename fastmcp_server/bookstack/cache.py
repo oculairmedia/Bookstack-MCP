@@ -6,8 +6,7 @@ import hashlib
 import json
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Set
-from functools import wraps
+from typing import Any, Dict, Optional, Set
 import threading
 
 
@@ -138,43 +137,6 @@ class SmartCache:
                 "hit_rate": f"{hit_rate:.2f}%",
                 "total_requests": total_requests,
             }
-
-
-# Global cache instance
-_global_cache = SmartCache(max_size=1000, default_ttl=300)
-
-
-def cached(ttl: Optional[float] = None, key_prefix: str = ""):
-    """Decorator to cache function results."""
-    
-    def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            # Generate cache key
-            cache_key = f"{key_prefix}:{func.__name__}:{_global_cache._make_key(*args, **kwargs)}"
-            
-            # Try to get from cache
-            cached_value = _global_cache.get(cache_key)
-            if cached_value is not None:
-                return cached_value
-            
-            # Execute function and cache result
-            result = func(*args, **kwargs)
-            _global_cache.set(cache_key, result, ttl)
-            return result
-        
-        # Add cache control methods
-        wrapper.cache_invalidate = lambda: _global_cache.invalidate(f"{key_prefix}:{func.__name__}")  # type: ignore[attr-defined]
-        wrapper.cache_stats = lambda: _global_cache.get_stats()  # type: ignore[attr-defined]
-        
-        return wrapper
-    
-    return decorator
-
-
-def get_cache() -> SmartCache:
-    """Get global cache instance."""
-    return _global_cache
 
 
 # Specialized caches for different data types

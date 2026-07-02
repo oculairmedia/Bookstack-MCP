@@ -270,30 +270,6 @@ def get_metrics_collector() -> MetricsCollector:
     return _metrics_collector
 
 
-def track_request(method: str, endpoint: str):
-    """Decorator to track request metrics."""
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            start_time = time.time()
-            error = None
-            status = 200
-            
-            try:
-                result = func(*args, **kwargs)
-                return result
-            except Exception as e:
-                error = str(e)
-                status = 500
-                raise
-            finally:
-                duration = time.time() - start_time
-                _metrics_collector.record_request(method, endpoint, duration, status, error)
-        
-        return wrapper
-    return decorator
-
-
 def track_tool(tool_name: str):
     """Decorator to track tool execution metrics."""
     def decorator(func):

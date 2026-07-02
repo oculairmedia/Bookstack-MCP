@@ -22,7 +22,7 @@ from .schemas import (
     TagDict, FilterEntry,
     TagListInput, BooksAssociationList, PayloadOverrides,
     BatchItemInput, BatchItemsListInput,
-    PreparedOperation, PreparedImage, CacheEntry,
+    PreparedOperation, PreparedImage, ImageListCacheEntry,
     _TAG_ITEM_SCHEMA, _TAG_SCHEMA, _TAG_LIST_SCHEMA,
     _BOOK_ASSOCIATIONS_SCHEMA,
     _RAW_OBJECT_PAYLOAD_SCHEMA, _JSON_STRING_PAYLOAD_SCHEMA,
@@ -1272,11 +1272,14 @@ def register_bookstack_tools(mcp: FastMCP, exclude: Optional[set[str]] = None) -
                 if book_filter_str:
                     payload["filename_filter"] = book_filter_str
 
-            # Get Hayhooks endpoint URL from environment
-            hayhooks_url = os.environ.get(
-                "HAYHOOKS_SEARCH_URL",
-                "http://192.168.50.90:1416/search_documents/run"
-            ).rstrip("/")
+            # Get Hayhooks endpoint URL from environment (no hardcoded default).
+            hayhooks_url = (os.environ.get("HAYHOOKS_SEARCH_URL") or "").strip().rstrip("/")
+            _ensure(
+                bool(hayhooks_url),
+                "Semantic search is not configured",
+                hint="Set HAYHOOKS_SEARCH_URL to your Hayhooks search endpoint "
+                "(e.g. http://hayhooks:1416/search_documents/run) to enable this tool.",
+            )
 
             try:
                 response = requests.post(

@@ -26,16 +26,17 @@ else:
     print("   Make sure BS_URL, BS_TOKEN_ID, and BS_TOKEN_SECRET are set in your environment", file=sys.stderr)
 
 from fastmcp import FastMCP
-from fastmcp_server.bookstack import register_bookstack_tools
+from fastmcp_server.bookstack import register_production_tools
 
 
 def main():
     """Run the FastMCP server with stdio transport."""
     mcp = FastMCP("BookStack MCP (FastMCP)")
-    
-    # Register all BookStack tools
-    register_bookstack_tools(mcp)
-    
+
+    # Register the same production tool stack the HTTP server uses so the
+    # Inspector exercises exactly what ships in production.
+    register_production_tools(mcp)
+
     # Run with stdio transport for MCP Inspector
     mcp.run(transport="stdio")
 

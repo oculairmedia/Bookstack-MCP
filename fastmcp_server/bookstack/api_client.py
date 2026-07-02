@@ -11,6 +11,8 @@ from datetime import datetime
 from typing import Any, Dict, NoReturn, Optional, Tuple
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from .cache import bookstack_cache
 from .metrics import get_metrics_collector
@@ -47,6 +49,40 @@ if not logger.handlers:
     logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 logger.propagate = False
+
+
+def _build_session() -> requests.Session:
+    """Create a pooled ``requests.Session`` with automatic retry/backoff.
+
+    Only idempotent methods are retried (urllib3's default ``allowed_methods``
+    excludes POST) so that create operations are never silently duplicated.
+    Retries target transient statuses and honor the ``Retry-After`` header.
+    """
+
+    retry = Retry(
+        total=int(os.environ.get("BS_HTTP_RETRIES", "3")),
+        connect=int(os.environ.get("BS_HTTP_RETRIES", "3")),
+        read=int(os.environ.get("BS_HTTP_RETRIES", "3")),
+        backoff_factor=float(os.environ.get("BS_HTTP_BACKOFF", "0.5")),
+        status_forcelist=(429, 502, 503, 504),
+        respect_retry_after_header=True,
+        raise_on_status=False,
+    )
+    pool_size = int(os.environ.get("BS_HTTP_POOL_SIZE", "10"))
+    adapter = HTTPAdapter(
+        max_retries=retry,
+        pool_connections=pool_size,
+        pool_maxsize=pool_size,
+    )
+    session = requests.Session()
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
+# Shared, connection-pooled session reused across all BookStack API calls.
+# Tests patch ``_session.request`` to intercept HTTP without real network I/O.
+_session = _build_session()
 
 
 def _require_env(var: str) -> str:
@@ -130,16 +166,56 @@ def _select_cache_bucket(method: str, path: str):
     return None
 
 
+def _env_ttl(var: str, default: float) -> float:
+    """Read a TTL (seconds) from the environment, falling back to a default."""
+
+    raw = os.environ.get(var)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+def _request_timeout(method: str, json_payload: Optional[Dict[str, Any]] = None) -> int:
+    """Choose an HTTP timeout, giving writes more headroom than reads.
+
+    Large page edits (big markdown/html bodies) can take BookStack noticeably
+    longer to persist and re-render, so write requests use a higher base
+    timeout that also scales with payload size. This prevents premature read
+    timeouts (and the wasteful body-resending retries they trigger) on large
+    but otherwise healthy edits.
+    """
+
+    if method.upper() == "GET":
+        return int(os.environ.get("BS_HTTP_TIMEOUT", "60"))
+
+    base = int(os.environ.get("BS_HTTP_WRITE_TIMEOUT", "120"))
+    if isinstance(json_payload, dict):
+        try:
+            size = len(json.dumps(json_payload, default=str))
+        except Exception:
+            size = 0
+        # Add ~30s of headroom per 100 KB of payload for very large edits.
+        base += (size // 100_000) * 30
+    return base
+
+
 def _cache_ttl_for(path: str) -> float:
-    """Determine a TTL for cached content based on endpoint."""
+    """Determine a TTL for cached content based on endpoint.
+
+    TTLs are read from the same ``BS_CACHE_*`` env vars honored by
+    ``BookStackCache`` so cache configuration lives in one place.
+    """
 
     if "/image" in path:
-        return 900.0  # 15 minutes
+        return _env_ttl("BS_CACHE_IMAGES_TTL", 900.0)  # 15 minutes
     if "/search" in path:
-        return 180.0  # 3 minutes
+        return _env_ttl("BS_CACHE_SEARCH_TTL", 180.0)  # 3 minutes
     if path.startswith("/api/pages") or path.startswith("/api/chapters"):
-        return 300.0  # 5 minutes
-    return 600.0  # default 10 minutes
+        return _env_ttl("BS_CACHE_PAGES_TTL", 300.0)  # 5 minutes
+    return _env_ttl("BS_CACHE_BOOKS_TTL", 600.0)  # default 10 minutes
 
 
 def _build_cache_key(method: str, path: str, params: Optional[Dict[str, Any]], json_payload: Optional[Dict[str, Any]]) -> str:
@@ -181,10 +257,15 @@ def _cache_tags_for_request(method: str, path: str) -> set[str]:
 
 
 def _invalidate_entity_cache(entity_type: str, entity_id: Optional[int] = None) -> None:
-    """Invalidate cached payloads for a given entity type."""
+    """Invalidate cached payloads for a given entity type.
+
+    Any content mutation can change search results, so the search bucket is
+    always cleared alongside the entity-specific buckets.
+    """
 
     try:
         bookstack_cache.invalidate_entity(entity_type, entity_id)
+        bookstack_cache.search.invalidate()
     except Exception:
         logger.warning(
             "bookstack.cache_invalidation_failed",
@@ -283,10 +364,12 @@ def _handle_bookstack_http_error(
         "response_preview": preview,
     }
     
+    # Avoid logging full request bodies: they can contain page content or PII.
+    # Record only field names so errors stay diagnosable without leaking data.
     if params is not None:
-        context["params"] = params
+        context["param_keys"] = list(params.keys()) if isinstance(params, dict) else None
     if json is not None:
-        context["payload"] = json
+        context["payload_keys"] = list(json.keys()) if isinstance(json, dict) else None
     if data is not None:
         context["data_keys"] = list(data.keys())
     if files is not None:
@@ -339,19 +422,20 @@ def _bookstack_request(
     error_message: Optional[str] = None
 
     try:
-        response = requests.request(
+        response = _session.request(
             method,
             url,
             headers=resolve_headers(),
             params=params,
             json=json,
-            timeout=60,
+            timeout=_request_timeout(method, json),
         )
         status_code = response.status_code
         response.raise_for_status()
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else "unknown"
         status_code = status if isinstance(status, int) else 0
+        error_message = f"HTTP {status}"
         _handle_bookstack_http_error(
             exc,
             default_hint="Verify the BookStack credentials, entity identifiers, and payload fields.",
@@ -427,17 +511,25 @@ def _bookstack_request_form(
     url = f"{resolve_base_url()}{path}"
     headers = resolve_headers()
     headers.pop("Content-Type", None)
+    collector = get_metrics_collector()
+    start_time = time.time()
+    status_code = 0
+    error_message: Optional[str] = None
     try:
-        response = requests.request(
+        response = _session.request(
             method,
             url,
             headers=headers,
             data=data,
             files=files,
-            timeout=120,
+            timeout=int(os.environ.get("BS_HTTP_FORM_TIMEOUT", "120")),
         )
+        status_code = response.status_code
         response.raise_for_status()
     except requests.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else "unknown"
+        status_code = status if isinstance(status, int) else 0
+        error_message = f"HTTP {status}"
         _handle_bookstack_http_error(
             exc,
             default_hint="Confirm the image identifiers and ensure the API token grants image permissions.",
@@ -451,11 +543,14 @@ def _bookstack_request_form(
             hint_422="Validation error (422): The image data is invalid. Check the response_preview for details.",
         )
     except requests.RequestException as exc:  # pragma: no cover - network failure path
+        error_message = str(exc)
         raise _tool_error(
             "Unable to reach the BookStack image endpoint",
             hint="Check network connectivity and ensure BS_URL is accessible.",
             context={"method": method, "path": path},
         ) from exc
+    finally:
+        collector.record_request(method, path, time.time() - start_time, status_code, error_message)
 
     if response.status_code == 204 or not response.content:
         return {"success": True, "status": response.status_code}

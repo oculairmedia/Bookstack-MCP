@@ -1,4 +1,4 @@
-# BookStack MCP Server
+# BookStack MCP Server - Expanded Version!
 
 This repository hosts a **Python FastMCP-based server** that exposes consolidated tools for managing a BookStack instance. The flagship capabilities are the image gallery management workflows that power authoring experiences in downstream MCP clients.
 
@@ -12,8 +12,20 @@ pip install -r fastmcp_server/requirements.txt
 Launch the FastMCP server after exporting your BookStack credentials (see below):
 
 ```bash
-cd fastmcp_server
-python3 -m fastmcp_server
+# From the repository root
+fastmcp run fastmcp_server/my_server.py:mcp --transport http --host 0.0.0.0 --port 3054
+```
+
+Alternatively, run the module directly (honors the `PORT` env var, defaults to 3054):
+
+```bash
+PYTHONPATH="$PWD" python3 fastmcp_server/my_server.py
+```
+
+Or use Docker Compose:
+
+```bash
+docker compose up --build
 ```
 
 ### Required environment
@@ -42,7 +54,27 @@ The Python FastMCP server provides comprehensive BookStack management through co
 - `bookstack_manage_images` — unified create/read/update/delete/list interface for images
 - `bookstack_search_images` — advanced discovery with extension, date, size, and usage filters
 
-All tools are registered by `fastmcp_server/bookstack/tools.py` and surfaced automatically when the FastMCP server starts.
+### Direct Page Tools
+- `bookstack_create_page_direct` / `bookstack_update_page_direct` — create/update pages with typed arguments
+- `bookstack_create_page_from_file` / `bookstack_update_page_from_file` — create/update pages from a Markdown file under `/data`
+
+> **Large page edits:** for content larger than ~50 KB, prefer the `*_from_file`
+> tools. Writing the markdown to a file under `/data` and passing its path avoids
+> embedding a huge string in the tool call (which some MCP clients truncate) and is
+> more reliable. Write requests also get a larger, payload-scaled timeout
+> (`BS_HTTP_WRITE_TIMEOUT`, default 120s) so big edits don't time out prematurely.
+
+### PDF & Attachment Tools
+- `bookstack_get_attachment_to_file` — download an attachment (base64 API content) to a file under `/data`
+- `bookstack_extract_pdf_attachment_text_to_file` — extract text from a PDF attachment via `pdftotext`
+- `bookstack_extract_embedded_page_pdfs` — extract all embedded PDF attachments referenced by a page
+- `bookstack_append_pdf_text_page` — append a title/bullet summary page to a PDF under `/data`
+
+### Observability
+- `bookstack_health_check`, `bookstack_get_metrics`, `bookstack_dashboard` — health and runtime metrics
+- `bookstack_semantic_search` — optional Hayhooks-backed semantic search (requires `HAYHOOKS_SEARCH_URL`)
+
+The production tool stack is registered by `register_production_tools()` in `fastmcp_server/bookstack/__init__.py`, used by both the HTTP server (`my_server.py`) and the stdio/Inspector launcher (`run_stdio.py`).
 
 > **📘 Letta Compatibility**: If you're using Letta as your MCP client, please read [docs/LETTA_COMPATIBILITY.md](docs/LETTA_COMPATIBILITY.md) for important compatibility requirements and best practices.
 

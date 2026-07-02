@@ -6,6 +6,7 @@ import json
 import pytest
 
 from fastmcp_server.bookstack.cache import SmartCache, bookstack_cache
+import fastmcp_server.bookstack.api_client as api_client
 import fastmcp_server.bookstack.tools as tools
 
 
@@ -64,7 +65,7 @@ def test_page_update_invalidates_cached_detail_read(monkeypatch: pytest.MonkeyPa
             return FakeResponse({"id": 7, "name": state["name"]})
         raise AssertionError(f"Unexpected request: {method} {url}")
 
-    monkeypatch.setattr("requests.request", fake_request)
+    monkeypatch.setattr(api_client._session, "request", fake_request)
     monkeypatch.setattr(tools, "_bookstack_base_url", lambda: "https://bookstack.example.com")
     monkeypatch.setattr(tools, "_bookstack_headers", lambda: {"Authorization": "Token test"})
 
