@@ -9,15 +9,28 @@ made and subprocess execution never uses shell=True.
 from __future__ import annotations
 
 import base64
+import mimetypes
+import os
 import re
 import subprocess
 from pathlib import Path
 from typing import Any, Optional
 
-from .api_client import _bookstack_request
+from .api_client import (
+    _bookstack_request,
+    _bookstack_request_form,
+    _invalidate_entity_cache,
+)
+from .tools_direct_pages import _reject_pdf_data_url
 
 _ALLOWED_ROOT = Path("/data")
 _PDF_MAGIC = b"%PDF"
+
+# PDF.js viewer base used for embedded attachment iframes. Configurable so the
+# hardcoded host stays maintainable, but defaults to the exact production value.
+_VIEWER_BASE = os.environ.get(
+    "BS_PDF_VIEWER_BASE", "https://docs.adium.tech/pdfjs/web/viewer.html"
+)
 
 # Matches embedded attachment references in page html/markdown, e.g.
 #   /attachments/12
@@ -181,6 +194,194 @@ def _find_embedded_attachment_ids(*sources: Optional[str]) -> list[int]:
     return list(seen.keys())
 
 
+def _viewer_url(attachment_id: int) -> str:
+    """Build the PDF.js viewer URL that references a BookStack attachment."""
+    return f"{_VIEWER_BASE}?file=%2Fattachments%2F{attachment_id}"
+
+
+def _build_iframe_block(attachment_id: int, section_label: str) -> str:
+    """Build the exact reviewed-PDF iframe section, referencing /attachments/{id}."""
+    return (
+        f"<p>{section_label}:</p>\n"
+        f'<p><iframe style="border:1px solid rgb(221,221,221);width:855px;height:2552px;" '
+        f'title="Reviewed PDF viewer" src="{_viewer_url(attachment_id)}" '
+        f'width="855" height="2552"></iframe></p>'
+    )
+
+
+def _upload_attachment(
+    page_id: int,
+    file_path: Path,
+    name: Optional[str],
+) -> dict[str, Any]:
+    """Upload a file under /data as a BookStack attachment on ``page_id``.
+
+    Uses the authenticated multipart API (POST /api/attachments); never a public
+    URL. Assumes ``file_path`` has already been validated under /data.
+    """
+    raw = file_path.read_bytes()
+    att_name = name or file_path.stem
+    mime = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
+
+    data = {"name": att_name, "uploaded_to": str(page_id)}
+    files = {"file": (file_path.name, raw, mime)}
+
+    resp = _bookstack_request_form("POST", "/api/attachments", data=data, files=files)
+    if not isinstance(resp, dict):
+        raise RuntimeError("Attachment upload returned unexpected JSON")
+
+    _invalidate_entity_cache("page", page_id)
+
+    att_id = resp.get("id")
+    return {
+        "page_id": page_id,
+        "attachment_id": att_id,
+        "name": resp.get("name"),
+        "extension": resp.get("extension"),
+        "uploaded_to": resp.get("uploaded_to"),
+        "file_path": str(file_path),
+        "bytes": len(raw),
+        "attachment_path": f"/attachments/{att_id}",
+        "viewer_url": _viewer_url(att_id),
+    }
+
+
+def _embed_attachment_on_page(
+    page_id: int,
+    attachment_id: int,
+    section_label: str,
+    replace_existing: bool,
+) -> dict[str, Any]:
+    """Append or replace a reviewed-PDF iframe section on a page.
+
+    Edits the page's existing source field (markdown when present, otherwise
+    html) so the source format and the original handbook iframe are preserved.
+    The caller is responsible for the confirm_update gate.
+    """
+    page = _bookstack_request("GET", f"/api/pages/{page_id}")
+    if not isinstance(page, dict):
+        raise RuntimeError(f"Page {page_id} returned unexpected JSON")
+
+    markdown = page.get("markdown")
+    if isinstance(markdown, str) and markdown.strip():
+        field = "markdown"
+        content = markdown
+    else:
+        field = "html"
+        content = page.get("html") or ""
+
+    original_refs = _find_embedded_attachment_ids(content)
+    block = _build_iframe_block(attachment_id, section_label)
+
+    replaced_existing = False
+    # Attachment refs that belong to a replaced reviewed section are expected to
+    # disappear, so they must not count against original-iframe preservation.
+    removed_refs: list[int] = []
+    if replace_existing:
+        prior_section = re.compile(
+            r"<p>" + re.escape(section_label) + r":</p>\s*<p><iframe.*?</iframe></p>",
+            re.DOTALL,
+        )
+        match = prior_section.search(content)
+        if match:
+            removed_refs = _find_embedded_attachment_ids(match.group(0))
+            new_content = content[: match.start()] + block + content[match.end() :]
+            replaced_existing = True
+        else:
+            new_content = f"{content}\n\n{block}"
+    else:
+        new_content = f"{content}\n\n{block}"
+
+    # Safety net: never write embedded PDF data URLs back to the page.
+    _reject_pdf_data_url(new_content)
+
+    payload = {"name": page.get("name"), field: new_content}
+    _bookstack_request("PUT", f"/api/pages/{page_id}", json=payload)
+    _invalidate_entity_cache("page", page_id)
+
+    new_refs = _find_embedded_attachment_ids(new_content)
+    original_iframe_preserved = (set(original_refs) - set(removed_refs)) <= set(new_refs)
+
+    return {
+        "page_id": page_id,
+        "attachment_id": attachment_id,
+        "updated": True,
+        "page_url": None,
+        "viewer_url": _viewer_url(attachment_id),
+        "replaced_existing": replaced_existing,
+        "original_iframe_preserved": original_iframe_preserved,
+    }
+
+
+def _append_pdf_text_page(
+    in_path: Path,
+    out_path: Path,
+    title: str,
+    bullet_items: list[str],
+) -> dict[str, Any]:
+    """Append a final text page (title + bullets) to a PDF under /data.
+
+    Assumes ``in_path`` and ``out_path`` have already been validated under /data.
+    """
+    from io import BytesIO
+
+    from pypdf import PdfReader, PdfWriter
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.units import inch
+    from reportlab.pdfgen import canvas
+
+    with in_path.open("rb") as handle:
+        if handle.read(4) != _PDF_MAGIC:
+            raise ValueError(f"{in_path} does not begin with %PDF")
+
+    reader = PdfReader(str(in_path))
+    original_page_count = len(reader.pages)
+
+    buffer = BytesIO()
+    pdf_canvas = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+
+    y = height - inch
+    pdf_canvas.setFont("Helvetica-Bold", 16)
+    pdf_canvas.drawString(inch, y, title)
+
+    y -= 0.5 * inch
+    pdf_canvas.setFont("Helvetica", 11)
+    for item in bullet_items:
+        if y < inch:
+            pdf_canvas.showPage()
+            pdf_canvas.setFont("Helvetica", 11)
+            y = height - inch
+        pdf_canvas.drawString(inch, y, f"\u2022 {item}")
+        y -= 0.3 * inch
+
+    pdf_canvas.showPage()
+    pdf_canvas.save()
+    buffer.seek(0)
+
+    overlay_reader = PdfReader(buffer)
+    writer = PdfWriter()
+    for page in reader.pages:
+        writer.add_page(page)
+    for page in overlay_reader.pages:
+        writer.add_page(page)
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("wb") as handle:
+        writer.write(handle)
+
+    bytes_written = out_path.stat().st_size
+    output_page_count = len(PdfReader(str(out_path)).pages)
+
+    return {
+        "input_pdf_path": str(in_path),
+        "output_pdf_path": str(out_path),
+        "original_page_count": original_page_count,
+        "output_page_count": output_page_count,
+        "bytes_written": bytes_written,
+    }
+
+
 def register_pdf_attachment_tools(mcp) -> None:
     @mcp.tool()
     def bookstack_get_attachment_to_file(
@@ -297,63 +498,96 @@ def register_pdf_attachment_tools(mcp) -> None:
         Reads input_pdf_path, builds a new final page with reportlab, merges it
         onto the original with pypdf, and writes output_pdf_path.
         """
-        from io import BytesIO
+        in_path = _safe_output_path(input_pdf_path, "input_pdf_path", must_exist=True)
+        out_path = _safe_output_path(output_pdf_path, "output_pdf_path")
 
-        from pypdf import PdfReader, PdfWriter
-        from reportlab.lib.pagesizes import letter
-        from reportlab.lib.units import inch
-        from reportlab.pdfgen import canvas
+        return _append_pdf_text_page(in_path, out_path, title, bullet_items)
+
+    @mcp.tool()
+    def bookstack_upload_attachment_from_file(
+        page_id: int,
+        file_path: str,
+        name: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """
+        Upload a file under /data as a BookStack attachment on a page.
+
+        Uses the authenticated BookStack API (POST /api/attachments) only, never
+        a public URL. Returns the new attachment id plus the /attachments/{id}
+        path and PDF.js viewer URL for embedding.
+        """
+        path = _safe_output_path(file_path, "file_path", must_exist=True)
+        return _upload_attachment(page_id, path, name)
+
+    @mcp.tool()
+    def bookstack_embed_pdf_attachment_on_page(
+        page_id: int,
+        attachment_id: int,
+        section_label: str = "Reviewed copy with suggested changes appended",
+        replace_existing: bool = False,
+        confirm_update: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Embed a BookStack attachment on a page via a PDF.js viewer iframe.
+
+        Builds an iframe referencing /attachments/{attachment_id} (never a data
+        URL). Appends a new reviewed-copy section, or (when replace_existing)
+        replaces only a prior section with the same label. The original handbook
+        iframe is preserved. Requires confirm_update=True to modify the page.
+        """
+        if not confirm_update:
+            return {
+                "updated": False,
+                "error": "confirm_update=True is required to modify the page.",
+                "page_id": page_id,
+                "attachment_id": attachment_id,
+            }
+
+        return _embed_attachment_on_page(
+            page_id, attachment_id, section_label, replace_existing
+        )
+
+    @mcp.tool()
+    def bookstack_create_review_pdf_attachment_for_page(
+        page_id: int,
+        input_pdf_path: str,
+        output_pdf_path: str,
+        title: str,
+        bullet_items: list[str],
+        section_label: str = "Reviewed copy with suggested changes appended",
+        confirm_update: bool = False,
+    ) -> dict[str, Any]:
+        """
+        End-to-end reviewed-PDF workflow: append, upload, embed.
+
+        Appends a text page (title + bullet_items) to input_pdf_path, writes
+        output_pdf_path, uploads it as a BookStack attachment on page_id, and
+        embeds it via /attachments/{new_id}. The original attachment and iframe
+        are preserved. Requires confirm_update=True to modify the page.
+        """
+        if not confirm_update:
+            return {
+                "page_updated": False,
+                "error": "confirm_update=True is required to modify the page.",
+                "page_id": page_id,
+            }
 
         in_path = _safe_output_path(input_pdf_path, "input_pdf_path", must_exist=True)
         out_path = _safe_output_path(output_pdf_path, "output_pdf_path")
 
-        with in_path.open("rb") as handle:
-            if handle.read(4) != _PDF_MAGIC:
-                raise ValueError(f"{in_path} does not begin with %PDF")
-
-        reader = PdfReader(str(in_path))
-        original_page_count = len(reader.pages)
-
-        buffer = BytesIO()
-        pdf_canvas = canvas.Canvas(buffer, pagesize=letter)
-        width, height = letter
-
-        y = height - inch
-        pdf_canvas.setFont("Helvetica-Bold", 16)
-        pdf_canvas.drawString(inch, y, title)
-
-        y -= 0.5 * inch
-        pdf_canvas.setFont("Helvetica", 11)
-        for item in bullet_items:
-            if y < inch:
-                pdf_canvas.showPage()
-                pdf_canvas.setFont("Helvetica", 11)
-                y = height - inch
-            pdf_canvas.drawString(inch, y, f"\u2022 {item}")
-            y -= 0.3 * inch
-
-        pdf_canvas.showPage()
-        pdf_canvas.save()
-        buffer.seek(0)
-
-        overlay_reader = PdfReader(buffer)
-        writer = PdfWriter()
-        for page in reader.pages:
-            writer.add_page(page)
-        for page in overlay_reader.pages:
-            writer.add_page(page)
-
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        with out_path.open("wb") as handle:
-            writer.write(handle)
-
-        bytes_written = out_path.stat().st_size
-        output_page_count = len(PdfReader(str(out_path)).pages)
+        append = _append_pdf_text_page(in_path, out_path, title, bullet_items)
+        up = _upload_attachment(page_id, out_path, None)
+        emb = _embed_attachment_on_page(
+            page_id, up["attachment_id"], section_label, replace_existing=False
+        )
 
         return {
-            "input_pdf_path": str(in_path),
-            "output_pdf_path": str(out_path),
-            "original_page_count": original_page_count,
-            "output_page_count": output_page_count,
-            "bytes_written": bytes_written,
+            "page_id": page_id,
+            "output_pdf_path": append["output_pdf_path"],
+            "original_page_count": append["original_page_count"],
+            "output_page_count": append["output_page_count"],
+            "attachment_id": up["attachment_id"],
+            "viewer_url": up["viewer_url"],
+            "page_updated": emb["updated"],
+            "original_iframe_preserved": emb["original_iframe_preserved"],
         }

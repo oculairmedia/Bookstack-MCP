@@ -26,6 +26,9 @@ EXPECTED_TOOLS = {
     "bookstack_extract_pdf_attachment_text_to_file",
     "bookstack_extract_embedded_page_pdfs",
     "bookstack_append_pdf_text_page",
+    "bookstack_upload_attachment_from_file",
+    "bookstack_embed_pdf_attachment_on_page",
+    "bookstack_create_review_pdf_attachment_for_page",
 }
 
 
