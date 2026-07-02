@@ -1,34 +1,9 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any, Optional
 
-import requests
-
-
-def _bookstack_base_url() -> str:
-    return os.environ["BS_URL"].rstrip("/")
-
-
-def _bookstack_headers() -> dict[str, str]:
-    return {
-        "Authorization": f"Token {os.environ['BS_TOKEN_ID']}:{os.environ['BS_TOKEN_SECRET']}",
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-    }
-
-
-def _raise_for_bookstack(response: requests.Response) -> None:
-    if response.ok:
-        return
-
-    try:
-        detail: Any = response.json()
-    except Exception:
-        detail = response.text
-
-    raise RuntimeError(f"BookStack API error {response.status_code}: {detail}")
+from .api_client import _bookstack_request, _invalidate_entity_cache
 
 
 def _safe_markdown_path(markdown_path: str) -> Path:
@@ -42,6 +17,12 @@ def _safe_markdown_path(markdown_path: str) -> Path:
         raise FileNotFoundError(f"Markdown file does not exist: {path}")
 
     return path
+
+
+def _created_page_id(response: Any) -> Optional[int]:
+    if isinstance(response, dict) and isinstance(response.get("id"), int):
+        return response["id"]
+    return None
 
 
 def register_direct_page_tools(mcp) -> None:
@@ -66,14 +47,9 @@ def register_direct_page_tools(mcp) -> None:
         if chapter_id is not None:
             payload["chapter_id"] = chapter_id
 
-        response = requests.post(
-            f"{_bookstack_base_url()}/api/pages",
-            headers=_bookstack_headers(),
-            json=payload,
-            timeout=90,
-        )
-        _raise_for_bookstack(response)
-        return response.json()
+        response = _bookstack_request("POST", "/api/pages", json=payload)
+        _invalidate_entity_cache("page", _created_page_id(response))
+        return response
 
     @mcp.tool()
     def bookstack_update_page_direct(
@@ -89,14 +65,9 @@ def register_direct_page_tools(mcp) -> None:
             "markdown": markdown,
         }
 
-        response = requests.put(
-            f"{_bookstack_base_url()}/api/pages/{page_id}",
-            headers=_bookstack_headers(),
-            json=payload,
-            timeout=90,
-        )
-        _raise_for_bookstack(response)
-        return response.json()
+        response = _bookstack_request("PUT", f"/api/pages/{page_id}", json=payload)
+        _invalidate_entity_cache("page", page_id)
+        return response
 
     @mcp.tool()
     def bookstack_create_page_from_file(
@@ -122,14 +93,9 @@ def register_direct_page_tools(mcp) -> None:
         if chapter_id is not None:
             payload["chapter_id"] = chapter_id
 
-        response = requests.post(
-            f"{_bookstack_base_url()}/api/pages",
-            headers=_bookstack_headers(),
-            json=payload,
-            timeout=90,
-        )
-        _raise_for_bookstack(response)
-        return response.json()
+        response = _bookstack_request("POST", "/api/pages", json=payload)
+        _invalidate_entity_cache("page", _created_page_id(response))
+        return response
 
     @mcp.tool()
     def bookstack_update_page_from_file(
@@ -148,11 +114,6 @@ def register_direct_page_tools(mcp) -> None:
             "markdown": markdown,
         }
 
-        response = requests.put(
-            f"{_bookstack_base_url()}/api/pages/{page_id}",
-            headers=_bookstack_headers(),
-            json=payload,
-            timeout=90,
-        )
-        _raise_for_bookstack(response)
-        return response.json()
+        response = _bookstack_request("PUT", f"/api/pages/{page_id}", json=payload)
+        _invalidate_entity_cache("page", page_id)
+        return response

@@ -2,33 +2,20 @@ services:
   bookstackmcp:
     build:
       context: .
-      args:
-        TRANSPORT: http
     image: bookstackmcp:http
     ports:
-      - "3054:3054"
+      - "${PORT:-3054}:${PORT:-3054}"
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      - PORT=3054
-      - TRANSPORT=http
-      - HTTP_ENDPOINT=/mcp
-      - HEALTH_ENDPOINT=/health
-      - HTTP_RESPONSE_MODE=batch
+      - PORT=${PORT:-3054}
       - BS_URL=${BS_URL}
       - BS_TOKEN_ID=${BS_TOKEN_ID}
       - BS_TOKEN_SECRET=${BS_TOKEN_SECRET}
-      - NODE_ENV=${NODE_ENV:-production}
     healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import socket; s=socket.create_connection(('localhost', 3054), 5); s.close()",
-        ]
-      interval: 10s
+      test: ["CMD", "python", "/app/fastmcp_server/healthcheck.py"]
+      interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s

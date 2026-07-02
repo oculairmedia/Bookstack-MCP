@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 from typing import Any, Callable, Dict, List, Optional, Union
-from urllib.parse import urlparse
 
 
 class ValidationError(Exception):
@@ -123,38 +122,6 @@ class InputValidator:
         
         if max_value is not None and value > max_value:
             raise ValidationError(f"{field_name} must be at most {max_value}")
-        
-        return value
-    
-    @classmethod
-    def validate_url(
-        cls,
-        value: str,
-        field_name: str,
-        *,
-        allowed_schemes: Optional[List[str]] = None,
-        allow_localhost: bool = False,
-    ) -> str:
-        """Validate URL input."""
-        
-        if not isinstance(value, str):
-            raise ValidationError(f"{field_name} must be a string")
-        
-        try:
-            parsed = urlparse(value)
-        except Exception as e:
-            raise ValidationError(f"{field_name} is not a valid URL: {e}")
-        
-        if not parsed.scheme:
-            raise ValidationError(f"{field_name} must include a scheme (http/https)")
-        
-        if allowed_schemes and parsed.scheme not in allowed_schemes:
-            raise ValidationError(
-                f"{field_name} scheme must be one of {allowed_schemes}, got {parsed.scheme}"
-            )
-        
-        if not allow_localhost and parsed.hostname in ["localhost", "127.0.0.1", "::1"]:
-            raise ValidationError(f"{field_name} cannot point to localhost")
         
         return value
     

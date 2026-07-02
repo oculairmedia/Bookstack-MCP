@@ -23,9 +23,10 @@ from .api_client import (
     _tool_error,
     logger,
 )
+from .content_operations import _normalise_str, _validate_positive_int
 from .cache import bookstack_cache
 from .schemas import (
-    CacheEntry,
+    ImageListCacheEntry,
     PreparedImage,
     _ALLOWED_MIME_TYPES,
     _ALLOWED_URL_SCHEMES,
@@ -36,43 +37,6 @@ from .schemas import (
     _MAX_URL_REDIRECTS,
     _REQUEST_TIMEOUT_SECONDS,
 )
-
-
-# ============================================================================
-# Helper functions used by image-related code
-# These are duplicated here until content_operations.py is created
-# ============================================================================
-
-def _validate_positive_int(value: Optional[Any], label: str) -> int:
-    """Ensure a positive integer value is provided."""
-    if value is None:
-        raise _tool_error(
-            f"{label} is required",
-            hint=f"Provide a numeric value for {label}.",
-        )
-    try:
-        int_value = int(value)
-    except (TypeError, ValueError) as exc:
-        raise _tool_error(
-            f"{label} must be a positive integer",
-            hint=f"Provide a numeric value greater than zero for {label}.",
-            context={"received": value},
-        ) from exc
-    if int_value <= 0:
-        raise _tool_error(
-            f"{label} must be a positive integer",
-            hint=f"Provide a numeric value greater than zero for {label}.",
-            context={"received": value},
-        )
-    return int_value
-
-
-def _normalise_str(value: Optional[str]) -> Optional[str]:
-    """Strip surrounding whitespace and return None when a string is empty."""
-    if value is None:
-        return None
-    stripped = value.strip()
-    return stripped or None
 
 
 # ============================================================================
@@ -185,8 +149,27 @@ def _resolve_url_targets(url: str) -> Sequence[str]:
     return resolved_ips
 
 
+def _is_bookstack_host(url: str) -> bool:
+    """Return True when a URL points at the configured BookStack instance.
+
+    The BookStack server is a trusted, already-authenticated endpoint that
+    commonly runs on a private/Docker IP, so same-host fetches (e.g. gallery
+    cover images) must not be rejected by the outbound SSRF guard.
+    """
+    try:
+        target = urlparse(url).hostname
+        bookstack = urlparse(_bookstack_base_url()).hostname
+    except Exception:
+        return False
+    if not target or not bookstack:
+        return False
+    return target.lower() == bookstack.lower()
+
+
 def _validate_remote_image_target(url: str) -> None:
     """Reject URLs that resolve to internal or otherwise unsafe IP ranges."""
+    if _is_bookstack_host(url):
+        return
     blocked_targets = []
     for ip_text in _resolve_url_targets(url):
         reason = _classify_disallowed_ip(ip_text)
@@ -531,13 +514,13 @@ def _build_list_cache_key(params: Dict[str, Any]) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def _get_cached_list(cache_key: str) -> Optional[CacheEntry]:
+def _get_cached_list(cache_key: str) -> Optional[ImageListCacheEntry]:
     cached = bookstack_cache.images.get(cache_key)
     if cached is None:
         return None
     if isinstance(cached, dict):
-        return CacheEntry(data=cached.get("data"), metadata=cached.get("metadata"))
-    return CacheEntry(data=cached)
+        return ImageListCacheEntry(data=cached.get("data"), metadata=cached.get("metadata"))
+    return ImageListCacheEntry(data=cached)
 
 
 def _set_cached_list(cache_key: str, data: Any, metadata: Optional[Dict[str, Any]]) -> None:

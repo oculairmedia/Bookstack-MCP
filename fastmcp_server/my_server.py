@@ -2,17 +2,13 @@
 
 import logging
 import os
-from fastmcp_server.bookstack.tools_direct_pages import register_direct_page_tools
 from pathlib import Path
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 
-logger = logging.getLogger("bookstack.mcp")
+from fastmcp_server.bookstack import register_production_tools
 
-from fastmcp_server.bookstack import (
-    register_simplified_bookstack_tools,
-    register_selective_bookstack_tools,
-)
+logger = logging.getLogger("bookstack.mcp")
 
 # Load environment variables from .env file
 # Look for .env in the parent directory (Bookstack-MCP/)
@@ -27,21 +23,15 @@ else:
 
 mcp = FastMCP("BookStack MCP (FastMCP)")
 
-# Register additional full-featured tools first (search, list, images)
-# This will also register the complex manage_content and batch_operations
-logger.info("Registering full-featured tools...")
-register_selective_bookstack_tools(mcp)
-
-# Then register simplified tools (now named as primary tools without _simple suffix)
-# These will replace the complex versions: bookstack_manage_content, bookstack_batch_operations
-logger.info("Registering simplified tools (replacing complex versions)...")
-register_simplified_bookstack_tools(mcp)
-
-register_direct_page_tools(mcp)
-logger.info("✅ Registered direct page tools: bookstack_create_page_direct, bookstack_update_page_direct, bookstack_create_page_from_file, bookstack_update_page_from_file")
-logger.info("✅ Registered 7 tools: manage_content, batch_operations, list, search, semantic_search, manage_images, search_images")
+logger.info("Registering BookStack production tool stack...")
+register_production_tools(mcp)
+logger.info(
+    "✅ Registered production tools: selective full-featured tools (search, list, "
+    "images, observability), simplified content_crud/batch_operations, direct page "
+    "tools, and PDF/attachment tools."
+)
 
 
 if __name__ == "__main__":
     # Default to the existing MCP HTTP endpoint so clients do not need reconfiguration.
-    mcp.run(transport="http", port=3054)
+    mcp.run(transport="http", port=int(os.environ.get("PORT", "3054")))
