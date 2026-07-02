@@ -267,7 +267,7 @@ class InputValidator:
         for html in html_blocks:
             # Check for dangerous patterns
             for xss_pattern in cls.XSS_PATTERNS:
-                if re.search(xss_pattern, html, re.IGNORECASE):
+                if xss_pattern.search(html):
                     raise ValidationError(f"{field_name} contains potentially malicious HTML")
         
         return value

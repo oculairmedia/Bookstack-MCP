@@ -2,6 +2,7 @@
 
 import logging
 import os
+from fastmcp_server.bookstack.tools_direct_pages import register_direct_page_tools
 from pathlib import Path
 from dotenv import load_dotenv
 from fastmcp import FastMCP
@@ -36,6 +37,8 @@ register_selective_bookstack_tools(mcp)
 logger.info("Registering simplified tools (replacing complex versions)...")
 register_simplified_bookstack_tools(mcp)
 
+register_direct_page_tools(mcp)
+logger.info("✅ Registered direct page tools: bookstack_create_page_direct, bookstack_update_page_direct, bookstack_create_page_from_file, bookstack_update_page_from_file")
 logger.info("✅ Registered 7 tools: manage_content, batch_operations, list, search, semantic_search, manage_images, search_images")
 
 

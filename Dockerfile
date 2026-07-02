@@ -5,6 +5,13 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
+# Install OS dependencies
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt-get update \
+    && apt-get install -y --no-install-recommends \
+      poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install Python dependencies first for better Docker layer caching
 COPY fastmcp_server/requirements.txt ./fastmcp_server/requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
