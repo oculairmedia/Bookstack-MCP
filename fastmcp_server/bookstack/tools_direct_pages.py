@@ -59,6 +59,12 @@ def register_direct_page_tools(mcp) -> None:
     ) -> dict[str, Any]:
         """
         Update a BookStack page using direct typed arguments.
+
+        This replaces the entire page body with `markdown`. For large edits
+        (roughly > 50 KB of markdown), prefer `bookstack_update_page_from_file`:
+        write the content to a file under /data and pass its path. That avoids
+        embedding a huge string in the tool call (which some MCP clients
+        truncate or reject) and is more reliable for big pages.
         """
         payload = {
             "name": name,
@@ -105,6 +111,10 @@ def register_direct_page_tools(mcp) -> None:
     ) -> dict[str, Any]:
         """
         Update a BookStack page from a Markdown file under /data.
+
+        Preferred for large page edits: the content is read from disk instead of
+        being passed inline, so there is no tool-call payload size limit. Write
+        the new markdown to a file under /data first, then pass its path here.
         """
         path = _safe_markdown_path(markdown_path)
         markdown = path.read_text(encoding="utf-8")

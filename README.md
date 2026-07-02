@@ -1,4 +1,4 @@
-# BookStack MCP Server
+# BookStack MCP Server - Expanded Version!
 
 This repository hosts a **Python FastMCP-based server** that exposes consolidated tools for managing a BookStack instance. The flagship capabilities are the image gallery management workflows that power authoring experiences in downstream MCP clients.
 
@@ -57,6 +57,12 @@ The Python FastMCP server provides comprehensive BookStack management through co
 ### Direct Page Tools
 - `bookstack_create_page_direct` / `bookstack_update_page_direct` — create/update pages with typed arguments
 - `bookstack_create_page_from_file` / `bookstack_update_page_from_file` — create/update pages from a Markdown file under `/data`
+
+> **Large page edits:** for content larger than ~50 KB, prefer the `*_from_file`
+> tools. Writing the markdown to a file under `/data` and passing its path avoids
+> embedding a huge string in the tool call (which some MCP clients truncate) and is
+> more reliable. Write requests also get a larger, payload-scaled timeout
+> (`BS_HTTP_WRITE_TIMEOUT`, default 120s) so big edits don't time out prematurely.
 
 ### PDF & Attachment Tools
 - `bookstack_get_attachment_to_file` — download an attachment (base64 API content) to a file under `/data`

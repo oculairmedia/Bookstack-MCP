@@ -178,6 +178,30 @@ def _env_ttl(var: str, default: float) -> float:
         return default
 
 
+def _request_timeout(method: str, json_payload: Optional[Dict[str, Any]] = None) -> int:
+    """Choose an HTTP timeout, giving writes more headroom than reads.
+
+    Large page edits (big markdown/html bodies) can take BookStack noticeably
+    longer to persist and re-render, so write requests use a higher base
+    timeout that also scales with payload size. This prevents premature read
+    timeouts (and the wasteful body-resending retries they trigger) on large
+    but otherwise healthy edits.
+    """
+
+    if method.upper() == "GET":
+        return int(os.environ.get("BS_HTTP_TIMEOUT", "60"))
+
+    base = int(os.environ.get("BS_HTTP_WRITE_TIMEOUT", "120"))
+    if isinstance(json_payload, dict):
+        try:
+            size = len(json.dumps(json_payload, default=str))
+        except Exception:
+            size = 0
+        # Add ~30s of headroom per 100 KB of payload for very large edits.
+        base += (size // 100_000) * 30
+    return base
+
+
 def _cache_ttl_for(path: str) -> float:
     """Determine a TTL for cached content based on endpoint.
 
@@ -404,7 +428,7 @@ def _bookstack_request(
             headers=resolve_headers(),
             params=params,
             json=json,
-            timeout=int(os.environ.get("BS_HTTP_TIMEOUT", "60")),
+            timeout=_request_timeout(method, json),
         )
         status_code = response.status_code
         response.raise_for_status()
